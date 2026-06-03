@@ -2,6 +2,12 @@
 
 **ShellcoinTicker** is a feature-rich, high-performance World of Warcraft (Vanilla 1.12) addon designed to track your holdings and simulate a live market for the hilarious commodity **Shellcoin (SHELL)**. It features a premium, interactive HUD with real-time financial tracking, advanced charting, and funny simulated market news feeds.
 
+## Screenshots
+
+| HUD Ticker Display | Configuration Options |
+| :---: | :---: |
+| ![HUD Display](Screenshots/HUD.png) | ![Options Window](Screenshots/Options.png) |
+
 ---
 
 ## Features
