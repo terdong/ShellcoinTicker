@@ -22,10 +22,9 @@
 - **Timeframe Filtering**: Select between **10M (Minutes)**, **1H (Hour)**, **1D (Day)**, **1Mo (Month)**, and **1Y (Year)** historical scales.
 - **Trend Sparkline**: Displays a quick rolling text trend history (e.g., `^`, `v`, `-`) using plain-text characters.
 
-### 3. Standards-Aligned Minimap Button
-- **FuBarPlugin-2.0 Structure**: Fully compatible with classic button bag managers (like MBF) for circular and square minimap bounds.
-- **Interactive States**: Supports pushed click-zoom visual feedback and locked mouse highlights.
-- **Drag Click Filtering**: Dragging the button dynamically moves it around the minimap bounds without accidentally firing left/right-click options or HUD toggles.
+### 3. Minimap Button
+- **HUD & Options Toggles**: Left-click to open the options window, right-click to show/hide the HUD.
+- **Draggable Positioning**: Click and drag to move the button around circular or square minimaps.
 
 ### 4. Mock Market & Server Price Sync
 - **Simulated Fluctuation**: Local price shifts dynamically with a slight positive drift.
