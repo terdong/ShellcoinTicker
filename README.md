@@ -34,9 +34,10 @@
   - *Goblins of Gadgetzan Integration* (Price pumps)
   - *Mysterious Murloc Whales* (Price surges)
 - **Live Server Sync**: Automatically disables mock simulation and locks onto live server broadcast prices whenever chat patterns matching `SHELLCOINTICKER BUY/SELL PRICE` or `SHELLCOINTICKER PRICE HAS` gold/silver/copper formats are spotted in public or private channels.
+- **Silent Auto Price Sync**: Periodically runs the `.shellcoin` server command internally to fetch live prices (configurable to **Off**, **1M**, **10M**, or **1H**). Both the outgoing command and incoming server replies are silently filtered from the player's chat log.
 
 ### 5. Premium Two-Column Options UI
-- **Left Column**: General settings (Toggle HUD visibility, Toggle Minimap button, Graph style Area/Candle selector, and HUD scale slider).
+- **Left Column**: General settings (Toggle HUD visibility, Toggle Minimap button, Graph style Area/Candle selector, HUD scale slider, and **Auto Sync** interval selection).
 - **Right Column**: Direct HUD component visibility checkbox toggles.
 - **History Management**: Buttons to wipe simulated transaction history or perform a full addon DB reset.
 

@@ -204,6 +204,9 @@ function ShellcoinTicker:InitializeDB()
     if ShellcoinTickerDB.showFeed == nil then
         ShellcoinTickerDB.showFeed = true
     end
+    if ShellcoinTickerDB.syncInterval == nil then
+        ShellcoinTickerDB.syncInterval = 600
+    end
 end
 
 -- Scan player bags and bank for Shellcoin
@@ -435,8 +438,8 @@ function ShellcoinTicker:UpdateHistoryAndChange(price)
             if time() - lastTime < 600 then
                 shouldInsert = false
             end
-        elseif ShellcoinTickerDB.mockMode and (time() - lastTime < 60) then
-            -- If in mockMode, limit updates to at most once per 60 seconds to prevent file bloat
+        elseif (time() - lastTime < 60) then
+            -- Limit history updates to at most once per 60 seconds to prevent file bloat in both modes
             shouldInsert = false
         end
     end
@@ -800,5 +803,26 @@ SlashCmdList["SHELLCOINTICKER"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct graph|r - Toggle graph style (Area / Candlestick)")
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ShellcoinTicker: Unknown command. Type '/sct help' to view help details.|r")
+    end
+end
+
+-- Hook ChatFrame_OnEvent to suppress the .shellcoin command and its price responses
+local original_ChatFrame_OnEvent = ChatFrame_OnEvent
+ChatFrame_OnEvent = function(event)
+    if event == "CHAT_MSG_SAY" and arg1 == ".shellcoin" then
+        return
+    end
+    if event == "CHAT_MSG_SYSTEM" or event == "CHAT_MSG_SAY" or event == "CHAT_MSG_YELL" or event == "CHAT_MSG_CHANNEL" or event == "CHAT_MSG_GUILD" or event == "CHAT_MSG_MONSTER_SAY" or event == "CHAT_MSG_MONSTER_YELL" then
+        if arg1 then
+            local msgUpper = string.upper(arg1)
+            if string.find(msgUpper, "SHELLCOIN BUY PRICE", 1, true) or
+               string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true) or
+               string.find(msgUpper, "SHELLCOIN PRICE HAS", 1, true) then
+                return
+            end
+        end
+    end
+    if original_ChatFrame_OnEvent then
+        original_ChatFrame_OnEvent(event)
     end
 end

@@ -342,6 +342,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
     -- Setup OnUpdate script for time accumulators
     local timeSinceSimUpdate = 0
     local timeSinceBagScan = 0
+    local timeSinceServerSync = 0
     
     frame:SetScript("OnUpdate", function()
         local elapsed = arg1 -- 1.12 passes elapsed time in global arg1
@@ -401,6 +402,18 @@ function ShellcoinTicker.UI:CreateMainFrame()
             if not ShellcoinTicker.speedrunMode then
                 ShellcoinTicker:UpdateSimulation()
             end
+        end
+        
+        -- Throttled server sync via .shellcoin command (configurable interval)
+        local syncInterval = ShellcoinTickerDB and ShellcoinTickerDB.syncInterval or 600
+        if syncInterval > 0 and ShellcoinTickerDB and not ShellcoinTickerDB.mockMode and not ShellcoinTicker.speedrunMode then
+            timeSinceServerSync = timeSinceServerSync + elapsed
+            if timeSinceServerSync >= syncInterval then
+                timeSinceServerSync = 0
+                SendChatMessage(".shellcoin", "SAY")
+            end
+        else
+            timeSinceServerSync = 0
         end
     end)
     

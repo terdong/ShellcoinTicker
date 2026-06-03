@@ -50,7 +50,7 @@ function ShellcoinTicker.UI:CreateOptionsFrame()
     local f = CreateFrame("Frame", "ShellcoinTickerOptionsFrame", UIParent)
     f:Hide()
     f:SetWidth(480)
-    f:SetHeight(260)
+    f:SetHeight(300)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true)
@@ -204,6 +204,30 @@ function ShellcoinTicker.UI:CreateOptionsFrame()
         this:ClearFocus()
     end)
     
+    -- 5. Auto Price Sync selection
+    local syncLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    syncLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -190)
+    syncLabel:SetText("Auto Sync:")
+    syncLabel:SetTextColor(1, 0.82, 0)
+    
+    local function CreateSyncButton(text, interval, parent, anchorTo, xOfs)
+        local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        btn:SetWidth(40)
+        btn:SetHeight(20)
+        btn:SetPoint("LEFT", parent, anchorTo, xOfs, 0)
+        btn:SetText(text)
+        btn:SetScript("OnClick", function()
+            ShellcoinTickerDB.syncInterval = interval
+            ShellcoinTicker.UI:RefreshOptionsUI()
+        end)
+        return btn
+    end
+    
+    f.syncOffBtn = CreateSyncButton("Off", 0, syncLabel, "RIGHT", 8)
+    f.sync1mBtn = CreateSyncButton("1M", 60, f.syncOffBtn, "RIGHT", 5)
+    f.sync10mBtn = CreateSyncButton("10M", 600, f.sync1mBtn, "RIGHT", 5)
+    f.sync1hBtn = CreateSyncButton("1H", 3600, f.sync10mBtn, "RIGHT", 5)
+    
     -- RIGHT COLUMN (HUD Component Visibility Settings)
     local hudVisibilityTitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hudVisibilityTitle:SetPoint("TOPLEFT", f, "TOPLEFT", 280, -36)
@@ -301,6 +325,23 @@ function ShellcoinTicker.UI:RefreshOptionsUI()
     else
         if f.areaBtn then f.areaBtn:LockHighlight() end
         if f.candleBtn then f.candleBtn:UnlockHighlight() end
+    end
+    
+    -- Sync Interval Lock Highlight
+    local interval = ShellcoinTickerDB.syncInterval or 600
+    if f.syncOffBtn then f.syncOffBtn:UnlockHighlight() end
+    if f.sync1mBtn then f.sync1mBtn:UnlockHighlight() end
+    if f.sync10mBtn then f.sync10mBtn:UnlockHighlight() end
+    if f.sync1hBtn then f.sync1hBtn:UnlockHighlight() end
+    
+    if interval == 0 then
+        if f.syncOffBtn then f.syncOffBtn:LockHighlight() end
+    elseif interval == 60 then
+        if f.sync1mBtn then f.sync1mBtn:LockHighlight() end
+    elseif interval == 600 then
+        if f.sync10mBtn then f.sync10mBtn:LockHighlight() end
+    elseif interval == 3600 then
+        if f.sync1hBtn then f.sync1hBtn:LockHighlight() end
     end
     
     -- Slider & EditBox
