@@ -229,7 +229,7 @@ function ShellcoinTicker:ScanBags()
                     local link = GetContainerItemLink(bag, slot)
                     if link then
                         -- Check for Shellcoin, but exclude counterfeit
-                        if string.find(link, "Shellcoin") and not string.find(link, "Counterfeit Shellcoin") then
+                        if string.find(link, "Shellcoin", 1, true) and not string.find(link, "Counterfeit Shellcoin", 1, true) then
                             bagsTotal = bagsTotal + count
                         end
                     end
@@ -253,7 +253,7 @@ function ShellcoinTicker:ScanBags()
                 if count and count > 0 then
                     local link = GetContainerItemLink(-1, slot)
                     if link then
-                        if string.find(link, "Shellcoin") and not string.find(link, "Counterfeit Shellcoin") then
+                        if string.find(link, "Shellcoin", 1, true) and not string.find(link, "Counterfeit Shellcoin", 1, true) then
                             bankTotal = bankTotal + count
                         end
                     end
@@ -270,7 +270,7 @@ function ShellcoinTicker:ScanBags()
                     if count and count > 0 then
                         local link = GetContainerItemLink(bag, slot)
                         if link then
-                            if string.find(link, "Shellcoin") and not string.find(link, "Counterfeit Shellcoin") then
+                            if string.find(link, "Shellcoin", 1, true) and not string.find(link, "Counterfeit Shellcoin", 1, true) then
                                 bankTotal = bankTotal + count
                             end
                         end
@@ -468,9 +468,9 @@ function ShellcoinTicker:ProcessChatMessage(msg)
     
     local msgUpper = string.upper(msg)
     
-    local isBuy = string.find(msgUpper, "SHELLCOIN BUY PRICE")
-    local isSell = string.find(msgUpper, "SHELLCOIN SELL PRICE")
-    local isBroadcast = string.find(msgUpper, "SHELLCOIN PRICE HAS")
+    local isBuy = string.find(msgUpper, "SHELLCOIN BUY PRICE", 1, true)
+    local isSell = string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true)
+    local isBroadcast = string.find(msgUpper, "SHELLCOIN PRICE HAS", 1, true)
     
     if isBuy or isSell or isBroadcast then
         local _, _, goldStr = string.find(msgUpper, "(%d+)G")

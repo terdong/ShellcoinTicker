@@ -4,6 +4,10 @@
 function ShellcoinTicker.UI:CreateMinimapButton()
     if self.minimapBtn then return end
     
+    if self.isSquareMinimap == nil then
+        self.isSquareMinimap = IsAddOnLoaded("CornerMinimap") or IsAddOnLoaded("SquareMinimap") or IsAddOnLoaded("Squeenix")
+    end
+    
     local minimapBtn = CreateFrame("Button", "ShellcoinTickerMinimapButton", Minimap)
     minimapBtn:SetWidth(31)
     minimapBtn:SetHeight(31)
@@ -121,7 +125,7 @@ function ShellcoinTicker.UI:UpdateMinimapButton()
     local angle = ShellcoinTickerDB.minimapAngle or 45
     local radAngle = math.rad(angle)
     local x, y
-    local isSquare = IsAddOnLoaded("CornerMinimap") or IsAddOnLoaded("SquareMinimap") or IsAddOnLoaded("Squeenix")
+    local isSquare = self.isSquareMinimap
     if not isSquare then
         x = 80 * math.cos(radAngle)
         y = 80 * math.sin(radAngle)
