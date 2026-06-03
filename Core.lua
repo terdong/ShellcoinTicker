@@ -827,13 +827,8 @@ end
 -- Hook ChatFrame_OnEvent to suppress the .shellcoin command and its price responses
 local original_ChatFrame_OnEvent = ChatFrame_OnEvent
 ChatFrame_OnEvent = function(event)
-    if event == "CHAT_MSG_SAY" and arg1 == ".shellcoin" then
-        if not ShellcoinTicker.isSilentSync then
-            return
-        end
-    end
     if event == "CHAT_MSG_SYSTEM" or event == "CHAT_MSG_SAY" or event == "CHAT_MSG_YELL" or event == "CHAT_MSG_CHANNEL" or event == "CHAT_MSG_GUILD" or event == "CHAT_MSG_MONSTER_SAY" or event == "CHAT_MSG_MONSTER_YELL" then
-        if arg1 then
+        if arg1 and ShellcoinTicker.isSilentSync then
             local msgUpper = string.upper(arg1)
             if string.find(msgUpper, "SHELLCOIN BUY PRICE", 1, true) or
                 string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true) or
