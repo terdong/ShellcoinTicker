@@ -32,12 +32,16 @@ function ShellcoinTicker.UI:UpdateGraph()
     local numActivePoints = table.getn(activeHistory)
     
     -- Filter history based on selected timeframe
-    local tf = ShellcoinTickerDB.selectedTimeframe or "10m"
-    local duration = 600 -- 10m
-    if tf == "1h" then
-        duration = 3600
-    elseif tf == "1d" then
+    local tf = ShellcoinTickerDB.selectedTimeframe
+    if tf == "10m" or not tf then
+        tf = "1h"
+        ShellcoinTickerDB.selectedTimeframe = "1h"
+    end
+    local duration = 3600 -- 1h
+    if tf == "1d" then
         duration = 86400
+    elseif tf == "1w" then
+        duration = 604800 -- 1w
     elseif tf == "1mo" then
         duration = 2592000
     elseif tf == "1y" then

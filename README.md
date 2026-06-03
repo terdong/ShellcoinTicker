@@ -19,7 +19,7 @@
 
 ### 2. Multi-Mode Graphing & Sparkline
 - **Two Charting Styles**: Switch between a sleek **Area Chart** and a traditional **Candlestick Chart** (tracking open, close, high, low intervals).
-- **Timeframe Filtering**: Select between **10M (Minutes)**, **1H (Hour)**, **1D (Day)**, **1Mo (Month)**, and **1Y (Year)** historical scales.
+- **Timeframe Filtering**: Select between **1H (Hour)**, **1D (Day)**, **1W (Week)**, **1Mo (Month)**, and **1Y (Year)** historical scales.
 - **Trend Sparkline**: Displays a quick rolling text trend history (e.g., `^`, `v`, `-`) using plain-text characters.
 
 ### 3. Minimap Button

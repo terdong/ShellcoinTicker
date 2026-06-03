@@ -166,8 +166,8 @@ function ShellcoinTicker:InitializeDB()
     if ShellcoinTickerDB.mockMode == nil then
         ShellcoinTickerDB.mockMode = false
     end
-    if not ShellcoinTickerDB.selectedTimeframe then
-        ShellcoinTickerDB.selectedTimeframe = "10m"
+    if not ShellcoinTickerDB.selectedTimeframe or ShellcoinTickerDB.selectedTimeframe == "10m" then
+        ShellcoinTickerDB.selectedTimeframe = "1h"
     end
     if not ShellcoinTickerDB.characters then
         ShellcoinTickerDB.characters = {}
@@ -719,19 +719,19 @@ SlashCmdList["SHELLCOINTICKER"] = function(msg)
             local times = {}
             local now = time()
 
-            -- 1. 10 points in the last 10 minutes (1m intervals)
+            -- 1. 10 points in the last 1 hour (6m intervals)
             for i = 10, 1, -1 do
-                table.insert(times, now - i * 60)
-            end
-
-            -- 2. 10 points in the last 1 hour (6m intervals)
-            for i = 10, 2, -1 do
                 table.insert(times, now - i * 360)
             end
 
-            -- 3. 20 points in the last 1 day (1h intervals)
+            -- 2. 20 points in the last 1 day (1h intervals)
             for i = 24, 2, -1 do
                 table.insert(times, now - i * 3600)
+            end
+
+            -- 3. 42 points in the last 1 week (4h intervals)
+            for i = 42, 2, -1 do
+                table.insert(times, now - i * 14400)
             end
 
             -- 4. 110 points in the last 30 days (6h intervals)

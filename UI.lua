@@ -16,9 +16,9 @@ ShellcoinTicker.UI = {
     graphVLines = {},
     graphMaxText = nil,
     graphMinText = nil,
-    btn10m = nil,
     btn1h = nil,
     btn1d = nil,
+    btn1w = nil,
     btn1mo = nil,
     btn1y = nil
 }
@@ -32,11 +32,15 @@ end
 
 function ShellcoinTicker.UI:UpdateTimeframeButtonHighlights()
     if not ShellcoinTickerDB then return end
-    local tf = ShellcoinTickerDB.selectedTimeframe or "10m"
+    local tf = ShellcoinTickerDB.selectedTimeframe
+    if tf == "10m" or not tf then
+        tf = "1h"
+        ShellcoinTickerDB.selectedTimeframe = "1h"
+    end
     local buttons = {
-        ["10m"] = self.btn10m,
         ["1h"] = self.btn1h,
         ["1d"] = self.btn1d,
+        ["1w"] = self.btn1w,
         ["1mo"] = self.btn1mo,
         ["1y"] = self.btn1y
     }
@@ -167,9 +171,9 @@ function ShellcoinTicker.UI:CreateMainFrame()
         return btn
     end
 
-    self.btn10m = CreateTFButton("10M", "10m", tfFrame, 0)
-    self.btn1h = CreateTFButton("1H", "1h", tfFrame, 44)
-    self.btn1d = CreateTFButton("1D", "1d", tfFrame, 88)
+    self.btn1h = CreateTFButton("1H", "1h", tfFrame, 0)
+    self.btn1d = CreateTFButton("1D", "1d", tfFrame, 44)
+    self.btn1w = CreateTFButton("1W", "1w", tfFrame, 88)
     self.btn1mo = CreateTFButton("1Mo", "1mo", tfFrame, 132)
     self.btn1y = CreateTFButton("1Y", "1y", tfFrame, 176)
 
