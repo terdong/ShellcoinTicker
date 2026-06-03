@@ -512,7 +512,6 @@ function ShellcoinTicker:ProcessChatMessage(msg)
             if ShellcoinTicker.UI and ShellcoinTicker.UI.UpdateDisplay then
                 ShellcoinTicker.UI:UpdateDisplay()
             end
-            ShellcoinTicker.isSilentSync = false
         end
     end
 end
@@ -827,12 +826,14 @@ end
 -- Hook ChatFrame_OnEvent to suppress the .shellcoin command and its price responses
 local original_ChatFrame_OnEvent = ChatFrame_OnEvent
 ChatFrame_OnEvent = function(event)
-    if event == "CHAT_MSG_SYSTEM" or event == "CHAT_MSG_SAY" or event == "CHAT_MSG_YELL" or event == "CHAT_MSG_CHANNEL" or event == "CHAT_MSG_GUILD" or event == "CHAT_MSG_MONSTER_SAY" or event == "CHAT_MSG_MONSTER_YELL" then
+    if event == "CHAT_MSG_SYSTEM" then
         if arg1 and ShellcoinTicker.isSilentSync then
             local msgUpper = string.upper(arg1)
-            if string.find(msgUpper, "SHELLCOIN BUY PRICE", 1, true) or
-                string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true) or
-                string.find(msgUpper, "SHELLCOIN PRICE HAS", 1, true) then
+            if string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true) then
+                ShellcoinTicker.isSilentSync = false
+                return
+            end
+            if string.find(msgUpper, "SHELLCOIN BUY PRICE", 1, true) then
                 return
             end
         end
