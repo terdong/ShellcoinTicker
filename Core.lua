@@ -10,19 +10,20 @@ ShellcoinTicker = {
     scanPending = true,
     speedrunMode = false,
     lastEventMsg = "Market is stable. HODL!",
-    
+    isSilentSync = false,
+
     -- List of funny simulated market events
     Events = {
-        { msg = "Goblins of Gadgetzan announce Shellcoin integration! Price pumps!", min = 1.15, max = 1.40 },
-        { msg = "Baron Revilgaz imposes a transaction fee in Booty Bay! Price dumps!", min = 0.65, max = 0.85 },
-        { msg = "Rumors of a massive sell-off flood the market! Panic selling!", min = 0.75, max = 0.90 },
-        { msg = "A mysterious whale (probably a murloc) buys 10,000 Shellcoins!", min = 1.10, max = 1.30 },
+        { msg = "Goblins of Gadgetzan announce Shellcoin integration! Price pumps!",        min = 1.15, max = 1.40 },
+        { msg = "Baron Revilgaz imposes a transaction fee in Booty Bay! Price dumps!",      min = 0.65, max = 0.85 },
+        { msg = "Rumors of a massive sell-off flood the market! Panic selling!",            min = 0.75, max = 0.90 },
+        { msg = "A mysterious whale (probably a murloc) buys 10,000 Shellcoins!",           min = 1.10, max = 1.30 },
         { msg = "The Great Gnomish Rugpull: Gnome developers disappear with the treasury!", min = 0.30, max = 0.60 },
         { msg = "Shellcoin is declared legal tender in Orgrimmar (temporary zoning rule).", min = 1.05, max = 1.15 },
-        { msg = "Stormwind Guard confiscates bags containing Shellcoins under AML acts.", min = 0.85, max = 0.95 },
-        { msg = "HODLers unite! A viral forum post urges players to NEVER sell.", min = 1.20, max = 1.50 },
-        { msg = "A local farmer finds a stash of Shellcoins in a chest. Supply surges!", min = 0.80, max = 0.90 },
-        { msg = "Celebrity Chef cooking show features Shellcoin soup. Demand rises!", min = 1.08, max = 1.25 }
+        { msg = "Stormwind Guard confiscates bags containing Shellcoins under AML acts.",   min = 0.85, max = 0.95 },
+        { msg = "HODLers unite! A viral forum post urges players to NEVER sell.",           min = 1.20, max = 1.50 },
+        { msg = "A local farmer finds a stash of Shellcoins in a chest. Supply surges!",    min = 0.80, max = 0.90 },
+        { msg = "Celebrity Chef cooking show features Shellcoin soup. Demand rises!",       min = 1.08, max = 1.25 }
     }
 }
 
@@ -37,7 +38,7 @@ function ShellcoinTicker:FormatMoney(copper)
     local g = math.floor(copper / 10000)
     local s = math.floor((copper - (g * 10000)) / 100)
     local c = math.floor(copper - (g * 10000) - (s * 100))
-    
+
     local str = ""
     if g > 0 then
         str = str .. "|cffffd700" .. g .. "g|r "
@@ -56,17 +57,17 @@ function ShellcoinTicker:InitializeDB()
     if not ShellcoinTickerDB then
         ShellcoinTickerDB = {}
     end
-    
+
     local realm = GetRealmName()
     local charKey = UnitName("player")
-    
+
     -- Detect if there is old flat data to migrate
     if rawget(ShellcoinTickerDB, "price") ~= nil or rawget(ShellcoinTickerDB, "characters") ~= nil then
         if not rawget(ShellcoinTickerDB, realm) then
             rawset(ShellcoinTickerDB, realm, {})
         end
         local currentDB = rawget(ShellcoinTickerDB, realm)
-        
+
         currentDB.price = rawget(ShellcoinTickerDB, "price") or currentDB.price or 0
         currentDB.change = rawget(ShellcoinTickerDB, "change") or currentDB.change or 0.0
         currentDB.history = rawget(ShellcoinTickerDB, "history") or currentDB.history
@@ -74,7 +75,7 @@ function ShellcoinTicker:InitializeDB()
         currentDB.isShown = rawget(ShellcoinTickerDB, "isShown")
         currentDB.mockMode = rawget(ShellcoinTickerDB, "mockMode")
         currentDB.selectedTimeframe = rawget(ShellcoinTickerDB, "selectedTimeframe")
-        
+
         -- Migrate characters to their respective realms
         local oldChars = rawget(ShellcoinTickerDB, "characters")
         if oldChars then
@@ -82,7 +83,7 @@ function ShellcoinTicker:InitializeDB()
                 local _, _, name, rName = string.find(oldKey, "^(.-)%s*-%s*(.+)$")
                 name = name or oldKey
                 rName = rName or realm
-                
+
                 if not rawget(ShellcoinTickerDB, rName) then
                     rawset(ShellcoinTickerDB, rName, {})
                 end
@@ -93,7 +94,7 @@ function ShellcoinTicker:InitializeDB()
                 rDB.characters[name] = charData
             end
         end
-        
+
         -- Clean up flat keys from global table
         rawset(ShellcoinTickerDB, "price", nil)
         rawset(ShellcoinTickerDB, "change", nil)
@@ -104,12 +105,12 @@ function ShellcoinTicker:InitializeDB()
         rawset(ShellcoinTickerDB, "selectedTimeframe", nil)
         rawset(ShellcoinTickerDB, "characters", nil)
     end
-    
+
     -- Ensure current realm subtable exists
     if not rawget(ShellcoinTickerDB, realm) then
         rawset(ShellcoinTickerDB, realm, {})
     end
-    
+
     -- Setup metatable redirection to current realm
     local mt = {
         __index = function(t, key)
@@ -132,7 +133,7 @@ function ShellcoinTicker:InitializeDB()
         end
     }
     setmetatable(ShellcoinTickerDB, mt)
-    
+
     -- Initialize defaults for the active realm
     if not ShellcoinTickerDB.price then
         ShellcoinTickerDB.price = 0
@@ -140,7 +141,7 @@ function ShellcoinTicker:InitializeDB()
     if not ShellcoinTickerDB.change then
         ShellcoinTickerDB.change = 0.0
     end
-    
+
     -- Migrate history to time-price table format if needed
     if ShellcoinTickerDB.history then
         local firstEntry = ShellcoinTickerDB.history[1]
@@ -155,7 +156,7 @@ function ShellcoinTicker:InitializeDB()
     else
         ShellcoinTickerDB.history = { { time = time(), price = 0 } }
     end
-    
+
     if not ShellcoinTickerDB.transactions then
         ShellcoinTickerDB.transactions = {}
     end
@@ -218,10 +219,10 @@ function ShellcoinTicker:ScanBags()
     if not ShellcoinTickerDB.characters[charKey] then
         ShellcoinTickerDB.characters[charKey] = { bags = 0, bank = 0 }
     end
-    
+
     local oldAuth = self.authenticCount or 0
     local bagsTotal = 0
-    
+
     -- In WoW 1.12, container slots are 0 (backpack) to 4 (bags)
     for bag = 0, 4 do
         local slots = GetContainerNumSlots(bag)
@@ -240,14 +241,14 @@ function ShellcoinTicker:ScanBags()
             end
         end
     end
-    
+
     ShellcoinTickerDB.characters[charKey].bags = bagsTotal
     self.bagsCount = bagsTotal
-    
+
     -- Only scan the bank if the bank frame is open
     if self.isBankOpen then
         local bankTotal = 0
-        
+
         -- Bank main container is -1
         local slots = GetContainerNumSlots(-1)
         if slots and slots > 0 then
@@ -263,7 +264,7 @@ function ShellcoinTicker:ScanBags()
                 end
             end
         end
-        
+
         -- Bank bag containers are 5 to 10
         for bag = 5, 10 do
             local slots = GetContainerNumSlots(bag)
@@ -281,19 +282,19 @@ function ShellcoinTicker:ScanBags()
                 end
             end
         end
-        
+
         ShellcoinTickerDB.characters[charKey].bank = bankTotal
         self.bankCount = bankTotal
     else
         self.bankCount = ShellcoinTickerDB.characters[charKey].bank or 0
     end
-    
+
     local newAuth = self.bagsCount + self.bankCount
     self.authenticCount = newAuth
-    
+
     local firstScan = (not self.firstScanDone)
     self.firstScanDone = true
-    
+
     -- Track transactions automatically on changes after the first scan
     if not firstScan and newAuth ~= oldAuth then
         local diff = newAuth - oldAuth
@@ -305,7 +306,7 @@ end
 function ShellcoinTicker:UpdateSimulation()
     -- Skip simulation if mock mode is disabled (i.e. server sync mode is active)
     if not ShellcoinTickerDB or not ShellcoinTickerDB.mockMode then return end
-    
+
     local currentPrice = ShellcoinTickerDB.price
     -- Seed price if it is 0 so the simulation can start fluctuating
     if currentPrice <= 0 then
@@ -313,12 +314,12 @@ function ShellcoinTicker:UpdateSimulation()
     end
     local changePct = 0
     local eventMsg = nil
-    
+
     -- 10% chance of a special market event
     if math.random(1, 100) <= 10 then
         local eventIndex = math.random(1, table.getn(self.Events))
         local event = self.Events[eventIndex]
-        
+
         -- Multiplier range
         local multiplier = event.min + (math.random() * (event.max - event.min))
         changePct = multiplier - 1.0
@@ -330,25 +331,25 @@ function ShellcoinTicker:UpdateSimulation()
         changePct = change
         currentPrice = math.floor(currentPrice * (1.0 + change))
     end
-    
+
     -- Ensure price doesn't fall to 0 (minimum 1 copper)
     if currentPrice < 1 then
         currentPrice = 1
     end
-    
+
     -- Calculate 24h change representation
     ShellcoinTickerDB.change = changePct
     ShellcoinTickerDB.price = currentPrice
-    
+
     -- Update news feed message
     if eventMsg then
         self.lastEventMsg = eventMsg
     else
         self.lastEventMsg = "Price updated. HODL! (Change: " .. string.format("%.1f%%", changePct * 100) .. ")"
     end
-    
+
     self:UpdateHistoryAndChange(currentPrice)
-    
+
     -- Update UI
     if ShellcoinTicker.UI and ShellcoinTicker.UI.UpdateDisplay then
         ShellcoinTicker.UI:UpdateDisplay()
@@ -361,18 +362,19 @@ function ShellcoinTicker:AddTransaction(quantity, unitPrice)
     if not ShellcoinTickerDB.transactions then
         ShellcoinTickerDB.transactions = {}
     end
-    
+
     local tx = {
         timestamp = time(),
         quantity = quantity,
         price = unitPrice
     }
     table.insert(ShellcoinTickerDB.transactions, tx)
-    
+
     local action = quantity > 0 and "bought" or "sold"
     local absQty = math.abs(quantity)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Recorded transaction: " .. action .. " " .. absQty .. " SHELL at " .. self:FormatMoney(unitPrice) .. " each.|r")
-    
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Recorded transaction: " ..
+        action .. " " .. absQty .. " SHELL at " .. self:FormatMoney(unitPrice) .. " each.|r")
+
     -- Refresh UI
     if ShellcoinTicker.UI and ShellcoinTicker.UI.UpdateDisplay then
         ShellcoinTicker.UI:UpdateDisplay()
@@ -384,12 +386,12 @@ function ShellcoinTicker:CalculateProfitLoss()
     local transactions = ShellcoinTickerDB and ShellcoinTickerDB.transactions or {}
     local holdings = 0
     local costBasis = 0
-    
+
     for i = 1, table.getn(transactions) do
         local tx = transactions[i]
         local qty = tx.quantity
         local price = tx.price
-        
+
         if qty > 0 then
             local newHoldings = holdings + qty
             costBasis = ((holdings * costBasis) + (qty * price)) / newHoldings
@@ -398,17 +400,17 @@ function ShellcoinTicker:CalculateProfitLoss()
             holdings = math.max(0, holdings + qty)
         end
     end
-    
+
     local currentHoldings = self.authenticCount or 0
     local totalInvested = currentHoldings * costBasis
     local currentMarketValue = currentHoldings * ShellcoinTickerDB.price
     local profitLoss = currentMarketValue - totalInvested
-    
+
     local profitLossPercent = 0
     if totalInvested > 0 then
         profitLossPercent = (profitLoss / totalInvested) * 100
     end
-    
+
     return totalInvested, profitLoss, profitLossPercent, costBasis
 end
 
@@ -421,14 +423,14 @@ function ShellcoinTicker:UpdateHistoryAndChange(price)
     end
     ShellcoinTickerDB.change = changePct
     ShellcoinTickerDB.price = price
-    
+
     if not ShellcoinTickerDB.history then
         ShellcoinTickerDB.history = {}
     end
-    
+
     local numEntries = table.getn(ShellcoinTickerDB.history)
     local lastEntry = numEntries > 0 and ShellcoinTickerDB.history[numEntries]
-    
+
     local shouldInsert = true
     if lastEntry and type(lastEntry) == "table" then
         local lastPrice = lastEntry.price or 0
@@ -443,11 +445,11 @@ function ShellcoinTicker:UpdateHistoryAndChange(price)
             shouldInsert = false
         end
     end
-    
+
     if shouldInsert then
         -- Insert new time-price entry
         table.insert(ShellcoinTickerDB.history, { time = time(), price = price })
-        
+
         -- Prune entries older than 1 year (31,536,000 seconds)
         local cutoff = time() - 31536000
         local pruned = {}
@@ -464,35 +466,36 @@ end
 -- Process incoming chat messages to sync with server prices
 function ShellcoinTicker:ProcessChatMessage(msg)
     if not msg then return end
-    
+
     -- Performance optimization: Early exit if "shellcoin" is not in the message.
     -- This prevents executing string.upper() and generating garbage for every single chat message.
     if not string.find(msg, "[Ss][Hh][Ee][Ll][Ll][Cc][Oo][Ii][Nn]") then return end
-    
+
     local msgUpper = string.upper(msg)
-    
+
     local isBuy = string.find(msgUpper, "SHELLCOIN BUY PRICE", 1, true)
     local isSell = string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true)
     local isBroadcast = string.find(msgUpper, "SHELLCOIN PRICE HAS", 1, true)
-    
+
     if isBuy or isSell or isBroadcast then
         local _, _, goldStr = string.find(msgUpper, "(%d+)G")
         local _, _, silverStr = string.find(msgUpper, "(%d+)S")
         local _, _, copperStr = string.find(msgUpper, "(%d+)C")
-        
+
         local gold = tonumber(goldStr) or 0
         local silver = tonumber(silverStr) or 0
         local copper = tonumber(copperStr) or 0
         local price = gold * 10000 + silver * 100 + copper
-        
+
         if price > 0 then
             -- Disable mock mode automatically when server price is detected
             if ShellcoinTickerDB.mockMode then
                 ShellcoinTickerDB.mockMode = false
                 ShellcoinTicker.speedrunMode = false
-                DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Live server price detected. Mock simulation and Speedrun modes disabled.|r")
+                DEFAULT_CHAT_FRAME:AddMessage(
+                    "|cff00ff00ShellcoinTicker: Live server price detected. Mock simulation and Speedrun modes disabled.|r")
             end
-            
+
             if isBuy then
                 ShellcoinTickerDB.buyPrice = price
             elseif isSell then
@@ -504,11 +507,12 @@ function ShellcoinTicker:ProcessChatMessage(msg)
                 ShellcoinTickerDB.sellPrice = nil
                 self:UpdateHistoryAndChange(price)
             end
-            
+
             -- Refresh UI
             if ShellcoinTicker.UI and ShellcoinTicker.UI.UpdateDisplay then
                 ShellcoinTicker.UI:UpdateDisplay()
             end
+            ShellcoinTicker.isSilentSync = false
         end
     end
 end
@@ -517,13 +521,14 @@ end
 local function OnEvent()
     if event == "ADDON_LOADED" and arg1 == "ShellcoinTicker" then
         ShellcoinTicker:InitializeDB()
-        
+
         -- Set up UI
         if ShellcoinTicker.UI and ShellcoinTicker.UI.CreateMainFrame then
             ShellcoinTicker.UI:CreateMainFrame()
         end
-        
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker loaded! Type /sct or /shellcointicker to toggle the HUD.|r")
+
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cff00ff00ShellcoinTicker loaded! Type /sct or /shellcointicker to toggle the HUD.|r")
     elseif event == "BAG_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
         ShellcoinTicker.scanPending = true
     elseif event == "BANKFRAME_OPENED" then
@@ -562,52 +567,52 @@ eventFrame:SetScript("OnEvent", OnEvent)
 -- Parse money string like "99g 99s 99c" or raw copper numbers
 function ShellcoinTicker:ParseMoneyString(str)
     if not str or str == "" then return nil end
-    
+
     -- If it is a pure number, treat it as copper
     if tonumber(str) then
         return tonumber(str)
     end
-    
+
     local strUpper = string.upper(str)
     local _, _, goldStr = string.find(strUpper, "(%d+)%s*G")
     local _, _, silverStr = string.find(strUpper, "(%d+)%s*S")
     local _, _, copperStr = string.find(strUpper, "(%d+)%s*C")
-    
+
     local gold = tonumber(goldStr) or 0
     local silver = tonumber(silverStr) or 0
     local copper = tonumber(copperStr) or 0
-    
+
     if gold == 0 and silver == 0 and copper == 0 then
         return nil
     end
-    
+
     return gold * 10000 + silver * 100 + copper
 end
 
 -- Full reset of addon data and settings
 function ShellcoinTicker:ResetAll()
     ShellcoinTicker.speedrunMode = false
-    
+
     -- Full wipe of the saved variables table
     if ShellcoinTickerDB then
         for k, v in pairs(ShellcoinTickerDB) do
             ShellcoinTickerDB[k] = nil
         end
     end
-    
+
     -- Re-initialize defaults
     ShellcoinTicker:InitializeDB()
-    
+
     -- Reset session state variables
     ShellcoinTicker.bagsCount = 0
     ShellcoinTicker.bankCount = 0
     ShellcoinTicker.authenticCount = 0
     ShellcoinTicker.lastEventMsg = "Addon fully reset by user."
-    
+
     -- Perform an immediate scan of bags to get current count, then mark scan complete
     ShellcoinTicker:ScanBags()
     ShellcoinTicker.scanPending = false
-    
+
     if ShellcoinTicker.UI then
         if ShellcoinTicker.UI.frame then
             ShellcoinTicker.UI.frame:SetScale(1.0)
@@ -633,13 +638,13 @@ SLASH_SHELLCOINTICKER2 = "/sct"
 SlashCmdList["SHELLCOINTICKER"] = function(msg)
     local _, _, cmd, args = string.find(msg or "", "^(%S*)%s*(.*)$")
     cmd = string.lower(cmd or "")
-    
+
     if cmd == "buy" or cmd == "sell" then
         local _, _, qtyStr, moneyStr = string.find(args or "", "^(%d+)%s*(.*)$")
         local qty = tonumber(qtyStr)
         local price = ShellcoinTickerDB.price
         local validPrice = true
-        
+
         if moneyStr and moneyStr ~= "" then
             local parsedPrice = ShellcoinTicker:ParseMoneyString(moneyStr)
             if parsedPrice then
@@ -648,7 +653,7 @@ SlashCmdList["SHELLCOINTICKER"] = function(msg)
                 validPrice = false
             end
         end
-        
+
         if qty and qty > 0 and validPrice then
             if cmd == "sell" then
                 qty = -qty
@@ -656,7 +661,8 @@ SlashCmdList["SHELLCOINTICKER"] = function(msg)
             ShellcoinTicker:AddTransaction(qty, price)
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ShellcoinTicker: Usage: /sct buy/sell <quantity> [price]|r")
-            DEFAULT_CHAT_FRAME:AddMessage("  e.g., |cff00ff00/sct buy 5 12g 50s|r or |cff00ff00/sct buy 10 99g 99s 99c|r")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                "  e.g., |cff00ff00/sct buy 5 12g 50s|r or |cff00ff00/sct buy 10 99g 99s 99c|r")
         end
     elseif cmd == "clear" then
         ShellcoinTickerDB.transactions = {}
@@ -695,50 +701,53 @@ SlashCmdList["SHELLCOINTICKER"] = function(msg)
         local subCmd = string.lower(args or "")
         local _, _, subClean = string.find(subCmd, "^%s*([%w]*)%s*$")
         subClean = subClean or ""
-        
+
         if subClean == "on" or subClean == "enable" then
             ShellcoinTickerDB.mockMode = true
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Mock simulation mode is now ENABLED. Price will fluctuate locally.|r")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                "|cff00ff00ShellcoinTicker: Mock simulation mode is now ENABLED. Price will fluctuate locally.|r")
         elseif subClean == "off" or subClean == "disable" then
             ShellcoinTickerDB.mockMode = false
             ShellcoinTicker.speedrunMode = false
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Mock simulation and Speedrun modes are now DISABLED. Live server price sync is active.|r")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                "|cff00ff00ShellcoinTicker: Mock simulation and Speedrun modes are now DISABLED. Live server price sync is active.|r")
         elseif subClean == "status" then
-            local statusStr = ShellcoinTickerDB.mockMode and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED (Live server mode)|r"
+            local statusStr = ShellcoinTickerDB.mockMode and "|cff00ff00ENABLED|r" or
+                "|cffff0000DISABLED (Live server mode)|r"
             DEFAULT_CHAT_FRAME:AddMessage("ShellcoinTicker: Mock simulation mode is currently " .. statusStr)
         elseif subClean == "fill" or subClean == "history" then
             -- Generate mock history data spanning 30 days, distributed across all timeframes
             local times = {}
             local now = time()
-            
+
             -- 1. 10 points in the last 10 minutes (1m intervals)
             for i = 10, 1, -1 do
                 table.insert(times, now - i * 60)
             end
-            
+
             -- 2. 10 points in the last 1 hour (6m intervals)
             for i = 10, 2, -1 do
                 table.insert(times, now - i * 360)
             end
-            
+
             -- 3. 20 points in the last 1 day (1h intervals)
             for i = 24, 2, -1 do
                 table.insert(times, now - i * 3600)
             end
-            
+
             -- 4. 110 points in the last 30 days (6h intervals)
             for i = 120, 5, -1 do
                 table.insert(times, now - i * 21600)
             end
-            
+
             -- 5. 100 points in the last 1 year (3.5-day intervals)
             for i = 100, 10, -1 do
                 table.insert(times, now - i * 302400)
             end
-            
+
             table.insert(times, now)
             table.sort(times)
-            
+
             local price = 100000 -- 10g base price
             ShellcoinTickerDB.history = {}
             for i = 1, table.getn(times) do
@@ -747,39 +756,43 @@ SlashCmdList["SHELLCOINTICKER"] = function(msg)
                 price = math.max(100, math.floor(price * (1.0 + change)))
                 table.insert(ShellcoinTickerDB.history, { time = times[i], price = price })
             end
-            
+
             local numH = table.getn(ShellcoinTickerDB.history)
             ShellcoinTickerDB.price = ShellcoinTickerDB.history[numH].price
-            local prevPrice = numH > 1 and ShellcoinTickerDB.history[numH-1].price or price
+            local prevPrice = numH > 1 and ShellcoinTickerDB.history[numH - 1].price or price
             ShellcoinTickerDB.change = (prevPrice > 0) and ((ShellcoinTickerDB.price - prevPrice) / prevPrice) or 0.0
-            
+
             ShellcoinTicker.lastEventMsg = "Mock history populated with " .. numH .. " points across all timeframes."
-            
+
             -- Refresh UI
             if ShellcoinTicker.UI and ShellcoinTicker.UI.UpdateDisplay then
                 ShellcoinTicker.UI:UpdateDisplay()
             end
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Mock history successfully populated with data for all timeframes!|r")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                "|cff00ff00ShellcoinTicker: Mock history successfully populated with data for all timeframes!|r")
         elseif subClean == "speedrun" or subClean == "fast" then
             ShellcoinTicker.speedrunMode = not ShellcoinTicker.speedrunMode
             if ShellcoinTicker.speedrunMode then
                 ShellcoinTickerDB.mockMode = true
                 ShellcoinTickerDB.history = {}
                 ShellcoinTicker.virtualTime = time() - 2592000 -- 30 days ago
-                ShellcoinTickerDB.price = 100000 -- 10g base price
-                DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Speedrun mock mode ENABLED. Simulating 30 days of data at 10m intervals, updating every 1 second.|r")
+                ShellcoinTickerDB.price = 100000               -- 10g base price
+                DEFAULT_CHAT_FRAME:AddMessage(
+                    "|cff00ff00ShellcoinTicker: Speedrun mock mode ENABLED. Simulating 30 days of data at 10m intervals, updating every 1 second.|r")
             else
                 DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Speedrun mock mode DISABLED.|r")
             end
         elseif subClean == "" then
             -- Toggle behavior if no argument passed
             ShellcoinTickerDB.mockMode = not ShellcoinTickerDB.mockMode
-            local statusStr = ShellcoinTickerDB.mockMode and "|cff00ff00ENABLED. Price will fluctuate locally.|r" or "|cffff0000DISABLED. Live server price sync is active.|r"
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Mock simulation mode has been toggled to " .. statusStr)
+            local statusStr = ShellcoinTickerDB.mockMode and "|cff00ff00ENABLED. Price will fluctuate locally.|r" or
+                "|cffff0000DISABLED. Live server price sync is active.|r"
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Mock simulation mode has been toggled to " ..
+                statusStr)
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ShellcoinTicker: Usage: /sct mock [on/off/status/fill]|r")
         end
-        
+
         -- If mockMode was enabled, trigger one fluctuation immediately so they see it work!
         if ShellcoinTickerDB.mockMode and subClean ~= "status" and subClean ~= "fill" and subClean ~= "history" then
             -- If current price is 0, give it a base simulated price (10g) so it can start fluctuating
@@ -795,14 +808,19 @@ SlashCmdList["SHELLCOINTICKER"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct options|r - Open options window")
         DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct show|r - Show the HUD frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct hide|r - Hide the HUD frame")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct buy <qty> [price]|r - Record a buy transaction (price in copper)")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct sell <qty> [price]|r - Record a sell transaction (price in copper)")
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "  |cff00ff00/sct buy <qty> [price]|r - Record a buy transaction (price in copper)")
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "  |cff00ff00/sct sell <qty> [price]|r - Record a sell transaction (price in copper)")
         DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct clear|r - Clear transaction history (resets cost basis)")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct reset|r - Full reset of price, history, transactions, and simulation lock")
-        DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct mock [on/off/status/fill/speedrun]|r - Toggle mock, fill, or start 30-day fast-forward")
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "  |cff00ff00/sct reset|r - Full reset of price, history, transactions, and simulation lock")
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "  |cff00ff00/sct mock [on/off/status/fill/speedrun]|r - Toggle mock, fill, or start 30-day fast-forward")
         DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00/sct graph|r - Toggle graph style (Area / Candlestick)")
     else
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ShellcoinTicker: Unknown command. Type '/sct help' to view help details.|r")
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff0000ShellcoinTicker: Unknown command. Type '/sct help' to view help details.|r")
     end
 end
 
@@ -810,14 +828,16 @@ end
 local original_ChatFrame_OnEvent = ChatFrame_OnEvent
 ChatFrame_OnEvent = function(event)
     if event == "CHAT_MSG_SAY" and arg1 == ".shellcoin" then
-        return
+        if not ShellcoinTicker.isSilentSync then
+            return
+        end
     end
     if event == "CHAT_MSG_SYSTEM" or event == "CHAT_MSG_SAY" or event == "CHAT_MSG_YELL" or event == "CHAT_MSG_CHANNEL" or event == "CHAT_MSG_GUILD" or event == "CHAT_MSG_MONSTER_SAY" or event == "CHAT_MSG_MONSTER_YELL" then
         if arg1 then
             local msgUpper = string.upper(arg1)
             if string.find(msgUpper, "SHELLCOIN BUY PRICE", 1, true) or
-               string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true) or
-               string.find(msgUpper, "SHELLCOIN PRICE HAS", 1, true) then
+                string.find(msgUpper, "SHELLCOIN SELL PRICE", 1, true) or
+                string.find(msgUpper, "SHELLCOIN PRICE HAS", 1, true) then
                 return
             end
         end
