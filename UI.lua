@@ -7,16 +7,57 @@ ShellcoinTicker.UI = {
     trendText = nil,
     holdingsText = nil,
     valueText = nil,
-    newsText = nil
+    newsText = nil,
+    investedText = nil,
+    profitLossText = nil,
+    graphFrame = nil,
+    graphDots = {},
+    graphHLines = {},
+    graphVLines = {},
+    graphMaxText = nil,
+    graphMinText = nil,
+    btn10m = nil,
+    btn1h = nil,
+    btn1d = nil,
+    btn1mo = nil,
+    btn1y = nil
 }
+
+function ShellcoinTicker.UI:SetTimeframe(tf)
+    if not ShellcoinTickerDB then return end
+    ShellcoinTickerDB.selectedTimeframe = tf
+    self:UpdateDisplay()
+    self:UpdateTimeframeButtonHighlights()
+end
+
+function ShellcoinTicker.UI:UpdateTimeframeButtonHighlights()
+    if not ShellcoinTickerDB then return end
+    local tf = ShellcoinTickerDB.selectedTimeframe or "10m"
+    local buttons = {
+        ["10m"] = self.btn10m,
+        ["1h"] = self.btn1h,
+        ["1d"] = self.btn1d,
+        ["1mo"] = self.btn1mo,
+        ["1y"] = self.btn1y
+    }
+    for key, btn in pairs(buttons) do
+        if btn then
+            if key == tf then
+                btn:GetFontString():SetTextColor(1, 0.82, 0) -- Gold
+            else
+                btn:GetFontString():SetTextColor(0.6, 0.6, 0.6) -- Gray
+            end
+        end
+    end
+end
 
 function ShellcoinTicker.UI:CreateMainFrame()
     if self.frame then return end
     
-    -- Main container frame
+    -- Main container frame (Height expanded to 240 to fit scale buttons)
     local frame = CreateFrame("Frame", "ShellcoinTickerFrame", UIParent)
-    frame:SetWidth(260)
-    frame:SetHeight(150)
+    frame:SetWidth(280)
+    frame:SetHeight(240)
     
     -- Set position from SavedVariables or default to center
     if ShellcoinTickerDB and ShellcoinTickerDB.x and ShellcoinTickerDB.y then
@@ -30,6 +71,8 @@ function ShellcoinTicker.UI:CreateMainFrame()
     frame:EnableMouse(true)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
+    frame:SetClampedToScreen(true) -- Prevent dragging the frame off the screen
+    frame:SetScale(ShellcoinTickerDB.hudScale or 1.0)
     
     -- Sleek background backdrop configuration
     frame:SetBackdrop({
@@ -78,9 +121,19 @@ function ShellcoinTicker.UI:CreateMainFrame()
         frame:Hide()
     end)
     
+    -- Real-time Invested Label
+    local investedText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    investedText:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -26)
+    self.investedText = investedText
+    
+    -- Real-time Profit/Loss Label
+    local profitLossText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    profitLossText:SetPoint("TOPLEFT", investedText, "BOTTOMLEFT", 0, -4)
+    self.profitLossText = profitLossText
+    
     -- Price Display
     local priceText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    priceText:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -26)
+    priceText:SetPoint("TOPLEFT", profitLossText, "BOTTOMLEFT", 0, -4)
     self.priceText = priceText
     
     -- Sparkline/Trend Indicator
@@ -88,16 +141,103 @@ function ShellcoinTicker.UI:CreateMainFrame()
     trendText:SetPoint("TOPLEFT", priceText, "BOTTOMLEFT", 0, -4)
     self.trendText = trendText
     
-    -- Sleek separator line
-    local line = frame:CreateTexture(nil, "ARTWORK")
-    line:SetHeight(1)
-    line:SetWidth(236)
-    line:SetPoint("TOPLEFT", trendText, "BOTTOMLEFT", 0, -6)
-    line:SetTexture(0.8, 0.6, 0.0, 0.3) -- transparent golden divider line
+    -- Timeframe selection frame container (Width 256, Height 18)
+    local tfFrame = CreateFrame("Frame", "ShellcoinTickerTimeframe", frame)
+    self.tfFrame = tfFrame
+    tfFrame:SetWidth(256)
+    tfFrame:SetHeight(18)
+    tfFrame:SetPoint("TOPLEFT", trendText, "BOTTOMLEFT", 0, -6)
     
-    -- Holdings Counter
+    local function CreateTFButton(text, tf, parent, xOfs)
+        local btn = CreateFrame("Button", nil, parent)
+        btn:SetWidth(40)
+        btn:SetHeight(16)
+        btn:SetPoint("LEFT", parent, "LEFT", xOfs, 0)
+        
+        local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetText(text)
+        fs:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        btn:SetFontString(fs)
+        
+        btn:SetScript("OnClick", function()
+            ShellcoinTicker.UI:SetTimeframe(tf)
+        end)
+        
+        return btn
+    end
+    
+    self.btn10m = CreateTFButton("10M", "10m", tfFrame, 0)
+    self.btn1h = CreateTFButton("1H", "1h", tfFrame, 44)
+    self.btn1d = CreateTFButton("1D", "1d", tfFrame, 88)
+    self.btn1mo = CreateTFButton("1Mo", "1mo", tfFrame, 132)
+    self.btn1y = CreateTFButton("1Y", "1y", tfFrame, 176)
+    
+    -- Inner Graph Frame (Width 256, Height 60, aligned below tfFrame)
+    local graphFrame = CreateFrame("Frame", "ShellcoinTickerGraph", frame)
+    graphFrame:SetWidth(256)
+    graphFrame:SetHeight(60)
+    graphFrame:SetPoint("TOPLEFT", tfFrame, "BOTTOMLEFT", 0, -4)
+    graphFrame:SetBackdrop({
+        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 8,
+        edgeSize = 8,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    graphFrame:SetBackdropColor(0, 0, 0, 0.5) -- darker inner background
+    graphFrame:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.4)
+    self.graphFrame = graphFrame
+    
+    -- Graph Min/Max overlay texts
+    local graphMaxText = graphFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    graphMaxText:SetPoint("TOPLEFT", graphFrame, "TOPLEFT", 6, -4)
+    graphMaxText:SetTextColor(0.8, 0.8, 0.8, 0.8)
+    self.graphMaxText = graphMaxText
+    
+    local graphMinText = graphFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    graphMinText:SetPoint("BOTTOMLEFT", graphFrame, "BOTTOMLEFT", 6, 4)
+    graphMinText:SetTextColor(0.8, 0.8, 0.8, 0.8)
+    self.graphMinText = graphMinText
+    
+    -- Pre-create graph elements pool
+    self.graphDots = {}
+    self.graphHLines = {}
+    self.graphVLines = {}
+    self.graphBars = {}
+    
+    for i = 1, 15 do
+        local dot = graphFrame:CreateTexture(nil, "OVERLAY")
+        dot:SetWidth(4)
+        dot:SetHeight(4)
+        dot:SetTexture(0, 0.65, 1, 0.9)
+        dot:Hide()
+        table.insert(self.graphDots, dot)
+    end
+    
+    for i = 1, 14 do
+        local hline = graphFrame:CreateTexture(nil, "ARTWORK")
+        hline:SetHeight(1.5)
+        hline:SetTexture(0, 0.65, 1, 0.8)
+        hline:Hide()
+        table.insert(self.graphHLines, hline)
+        
+        local vline = graphFrame:CreateTexture(nil, "ARTWORK")
+        vline:SetWidth(1.5)
+        vline:SetTexture(0, 0.65, 1, 0.8)
+        vline:Hide()
+        table.insert(self.graphVLines, vline)
+        
+        local bar = graphFrame:CreateTexture(nil, "BACKGROUND")
+        bar:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
+        bar:SetGradientAlpha("VERTICAL", 0, 0.65, 1, 0.02, 0, 0.65, 1, 0.30)
+        bar:Hide()
+        table.insert(self.graphBars, bar)
+    end
+    
+    -- Holdings Counter (positioned below graphFrame)
     local holdingsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    holdingsText:SetPoint("TOPLEFT", trendText, "BOTTOMLEFT", 0, -14)
+    holdingsText:SetPoint("TOPLEFT", graphFrame, "BOTTOMLEFT", 0, -8)
     self.holdingsText = holdingsText
     
     -- Holdings Net Value
@@ -105,10 +245,93 @@ function ShellcoinTicker.UI:CreateMainFrame()
     valueText:SetPoint("TOPLEFT", holdingsText, "BOTTOMLEFT", 0, -4)
     self.valueText = valueText
     
+    -- Hover frame to show character breakdown tooltip
+    local hoverFrame = CreateFrame("Frame", nil, frame)
+    self.holdingsHoverFrame = hoverFrame
+    hoverFrame:SetPoint("TOPLEFT", holdingsText, "TOPLEFT")
+    hoverFrame:SetPoint("BOTTOMRIGHT", valueText, "BOTTOMRIGHT")
+    hoverFrame:EnableMouse(true)
+    hoverFrame:RegisterForDrag("LeftButton")
+    hoverFrame:SetScript("OnDragStart", function()
+        this:GetParent():StartMoving()
+    end)
+    hoverFrame:SetScript("OnDragStop", function()
+        this:GetParent():StopMovingOrSizing()
+        local parent = this:GetParent()
+        local point, _, relativePoint, xOfs, yOfs = parent:GetPoint()
+        if ShellcoinTickerDB then
+            ShellcoinTickerDB.point = point
+            ShellcoinTickerDB.x = xOfs
+            ShellcoinTickerDB.y = yOfs
+        end
+    end)
+    hoverFrame:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("Shellcoin Holdings", 1, 0.82, 0)
+        
+        local currentRealm = GetRealmName()
+        local accountTotal = 0
+        local realmTotal = 0
+        local currentPrice = ShellcoinTickerDB.price or 0
+        
+        -- 1. Current Realm list
+        local hasCurrentRealmChars = false
+        if ShellcoinTickerDB and ShellcoinTickerDB.characters then
+            for name, data in pairs(ShellcoinTickerDB.characters) do
+                local bags = data.bags or 0
+                local bank = data.bank or 0
+                local charTotal = bags + bank
+                if charTotal > 0 then
+                    if not hasCurrentRealmChars then
+                        GameTooltip:AddLine(" ")
+                        GameTooltip:AddLine("Current Realm (" .. currentRealm .. "):", 0.5, 0.8, 1)
+                        hasCurrentRealmChars = true
+                    end
+                    realmTotal = realmTotal + charTotal
+                    accountTotal = accountTotal + charTotal
+                    GameTooltip:AddDoubleLine("|cffffffff" .. name .. "|r", charTotal .. " SHELL (|cffc7c7c7Bags: " .. bags .. ", Bank: " .. bank .. "|r)", 1, 1, 1, 1, 1, 1)
+                end
+            end
+        end
+        
+        -- 2. Other Realms list
+        local hasOtherRealms = false
+        for realmName, realmData in pairs(ShellcoinTickerDB) do
+            if realmName ~= currentRealm and type(realmData) == "table" and realmData.characters then
+                for name, data in pairs(realmData.characters) do
+                    local bags = data.bags or 0
+                    local bank = data.bank or 0
+                    local charTotal = bags + bank
+                    if charTotal > 0 then
+                        if not hasOtherRealms then
+                            GameTooltip:AddLine(" ")
+                            GameTooltip:AddLine("Other Realms:", 0.5, 0.8, 1)
+                            hasOtherRealms = true
+                        end
+                        accountTotal = accountTotal + charTotal
+                        GameTooltip:AddDoubleLine("|cffc7c7c7" .. name .. " (" .. realmName .. ")|r", charTotal .. " SHELL (|cff888888Bags: " .. bags .. ", Bank: " .. bank .. "|r)", 0.7, 0.7, 0.7, 0.7, 0.7, 0.7)
+                    end
+                end
+            end
+        end
+        
+        local totalValue = accountTotal * currentPrice
+        
+        GameTooltip:AddLine("--------------------------------------------------", 0.5, 0.5, 0.5)
+        GameTooltip:AddDoubleLine("|cffffd700Realm Total:|r", "|cffffd700" .. realmTotal .. " SHELL|r", 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine("|cffffd700Account Total:|r", "|cffffd700" .. accountTotal .. " SHELL|r", 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine("|cffffd700Account Net Worth:|r", ShellcoinTicker:FormatMoney(totalValue), 1, 1, 1, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    hoverFrame:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    
     -- News Feed Label
     local newsText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     newsText:SetPoint("TOPLEFT", valueText, "BOTTOMLEFT", 0, -8)
-    newsText:SetWidth(236)
+    newsText:SetWidth(256)
     newsText:SetHeight(24)
     newsText:SetJustifyH("LEFT")
     newsText:SetJustifyV("TOP")
@@ -116,7 +339,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
     
     self.frame = frame
     
-    -- Setup OnUpdate script for time accumulators (efficiently updates price and scans bags)
+    -- Setup OnUpdate script for time accumulators
     local timeSinceSimUpdate = 0
     local timeSinceBagScan = 0
     
@@ -124,10 +347,46 @@ function ShellcoinTicker.UI:CreateMainFrame()
         local elapsed = arg1 -- 1.12 passes elapsed time in global arg1
         if not elapsed then return end
         
-        -- Throttled inventory scan
+        -- Throttled inventory scan & Speedrun simulation
         timeSinceBagScan = timeSinceBagScan + elapsed
         if timeSinceBagScan >= 1.0 then
             timeSinceBagScan = 0
+            
+            -- Speedrun Simulation Tick
+            if ShellcoinTicker.speedrunMode then
+                if ShellcoinTicker.virtualTime and ShellcoinTicker.virtualTime < time() then
+                    -- Advance by 10 minutes (600s)
+                    ShellcoinTicker.virtualTime = ShellcoinTicker.virtualTime + 600
+                    
+                    local currentPrice = ShellcoinTickerDB.price or 100000
+                    local change = -0.05 + (math.random() * 0.11)
+                    local newPrice = math.max(100, math.floor(currentPrice * (1.0 + change)))
+                    ShellcoinTickerDB.price = newPrice
+                    
+                    -- Record history
+                    table.insert(ShellcoinTickerDB.history, { time = ShellcoinTicker.virtualTime, price = newPrice })
+                    
+                    -- Prune
+                    local cutoff = ShellcoinTicker.virtualTime - 31536000
+                    local pruned = {}
+                    for i = 1, table.getn(ShellcoinTickerDB.history) do
+                        local entry = ShellcoinTickerDB.history[i]
+                        if entry and entry.time >= cutoff then
+                            table.insert(pruned, entry)
+                        end
+                    end
+                    ShellcoinTickerDB.history = pruned
+                    
+                    ShellcoinTicker.lastEventMsg = "Speedrunning... " .. date("%m/%d %H:%M", ShellcoinTicker.virtualTime) .. " (" .. ShellcoinTicker:FormatMoney(newPrice) .. ")"
+                    ShellcoinTicker.UI:UpdateDisplay()
+                else
+                    ShellcoinTicker.speedrunMode = false
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ShellcoinTicker: Speedrun simulation completed! Returned to normal mock mode.|r")
+                    ShellcoinTicker.lastEventMsg = "Speedrun simulation completed."
+                    ShellcoinTicker.UI:UpdateDisplay()
+                end
+            end
+            
             if ShellcoinTicker.scanPending then
                 ShellcoinTicker:ScanBags()
                 ShellcoinTicker.scanPending = false
@@ -139,7 +398,9 @@ function ShellcoinTicker.UI:CreateMainFrame()
         timeSinceSimUpdate = timeSinceSimUpdate + elapsed
         if timeSinceSimUpdate >= 15.0 then
             timeSinceSimUpdate = 0
-            ShellcoinTicker:UpdateSimulation()
+            if not ShellcoinTicker.speedrunMode then
+                ShellcoinTicker:UpdateSimulation()
+            end
         end
     end)
     
@@ -150,18 +411,263 @@ function ShellcoinTicker.UI:CreateMainFrame()
         frame:Show()
     end
     
-    -- Initial update
+    -- Initial update & button highlights
+    self:LayoutHUD()
     self:UpdateDisplay()
+    self:UpdateTimeframeButtonHighlights()
+    
+    -- Create Minimap Button
+    self:CreateMinimapButton()
+end
+
+function ShellcoinTicker.UI:LayoutHUD()
+    if not self.frame or not ShellcoinTickerDB then return end
+    
+    -- Clear all points first
+    self.investedText:ClearAllPoints()
+    self.profitLossText:ClearAllPoints()
+    self.priceText:ClearAllPoints()
+    self.trendText:ClearAllPoints()
+    if self.tfFrame then
+        self.tfFrame:ClearAllPoints()
+    end
+    if self.graphFrame then
+        self.graphFrame:ClearAllPoints()
+    end
+    self.holdingsText:ClearAllPoints()
+    self.valueText:ClearAllPoints()
+    self.newsText:ClearAllPoints()
+    
+    -- Cache settings, default to true if nil
+    local showFin = ShellcoinTickerDB.showFinancials
+    if showFin == nil then showFin = true end
+    local showPrice = ShellcoinTickerDB.showPriceTrend
+    if showPrice == nil then showPrice = true end
+    local showTF = ShellcoinTickerDB.showTimeframe
+    if showTF == nil then showTF = true end
+    local showChart = ShellcoinTickerDB.showChart
+    if showChart == nil then showChart = true end
+    local showHold = ShellcoinTickerDB.showHoldings
+    if showHold == nil then showHold = true end
+    local showFeed = ShellcoinTickerDB.showFeed
+    if showFeed == nil then showFeed = true end
+    
+    -- Set visibilities
+    if showFin then
+        self.investedText:Show()
+        self.profitLossText:Show()
+    else
+        self.investedText:Hide()
+        self.profitLossText:Hide()
+    end
+    
+    if showPrice then
+        self.priceText:Show()
+        self.trendText:Show()
+    else
+        self.priceText:Hide()
+        self.trendText:Hide()
+    end
+    
+    if self.tfFrame then
+        if showTF then
+            self.tfFrame:Show()
+        else
+            self.tfFrame:Hide()
+        end
+    end
+    
+    if self.graphFrame then
+        if showChart then
+            self.graphFrame:Show()
+        else
+            self.graphFrame:Hide()
+        end
+    end
+    
+    if showHold then
+        self.holdingsText:Show()
+        self.valueText:Show()
+        if self.holdingsHoverFrame then self.holdingsHoverFrame:Show() end
+    else
+        self.holdingsText:Hide()
+        self.valueText:Hide()
+        if self.holdingsHoverFrame then self.holdingsHoverFrame:Hide() end
+    end
+    
+    if showFeed then
+        self.newsText:Show()
+    else
+        self.newsText:Hide()
+    end
+    
+    -- Sequential positioning
+    local lastAnchor = self.frame
+    local relativePoint = "TOPLEFT"
+    local xOffset = 12
+    local yOffset = -26
+    
+    local isFirst = true
+    local height = 26 -- starting height (header)
+    
+    -- 1. Financials
+    if showFin then
+        self.investedText:SetPoint("TOPLEFT", lastAnchor, relativePoint, xOffset, yOffset)
+        self.profitLossText:SetPoint("TOPLEFT", self.investedText, "BOTTOMLEFT", 0, -4)
+        lastAnchor = self.profitLossText
+        relativePoint = "BOTTOMLEFT"
+        xOffset = 0
+        yOffset = -4
+        
+        height = height + 28
+        isFirst = false
+    end
+    
+    -- 2. Price & Trend
+    if showPrice then
+        if not isFirst then
+            height = height + 4
+        end
+        self.priceText:SetPoint("TOPLEFT", lastAnchor, relativePoint, xOffset, yOffset)
+        self.trendText:SetPoint("TOPLEFT", self.priceText, "BOTTOMLEFT", 0, -4)
+        lastAnchor = self.trendText
+        relativePoint = "BOTTOMLEFT"
+        xOffset = 0
+        yOffset = -4
+        
+        height = height + 26
+        isFirst = false
+    end
+    
+    -- 3. Timeframe
+    if showTF and self.tfFrame then
+        if not isFirst then
+            yOffset = -6
+            height = height + 6
+        else
+            yOffset = -26
+        end
+        self.tfFrame:SetPoint("TOPLEFT", lastAnchor, relativePoint, xOffset, yOffset)
+        lastAnchor = self.tfFrame
+        relativePoint = "BOTTOMLEFT"
+        xOffset = 0
+        yOffset = -4
+        
+        height = height + 18
+        isFirst = false
+    end
+    
+    -- 4. Chart (graphFrame)
+    if showChart and self.graphFrame then
+        if not isFirst then
+            yOffset = -4
+            height = height + 4
+        else
+            yOffset = -26
+        end
+        self.graphFrame:SetPoint("TOPLEFT", lastAnchor, relativePoint, xOffset, yOffset)
+        lastAnchor = self.graphFrame
+        relativePoint = "BOTTOMLEFT"
+        xOffset = 0
+        yOffset = -8
+        
+        height = height + 60
+        isFirst = false
+    end
+    
+    -- 5. Holdings
+    if showHold then
+        if not isFirst then
+            yOffset = -8
+            height = height + 8
+        else
+            yOffset = -26
+        end
+        self.holdingsText:SetPoint("TOPLEFT", lastAnchor, relativePoint, xOffset, yOffset)
+        self.valueText:SetPoint("TOPLEFT", self.holdingsText, "BOTTOMLEFT", 0, -4)
+        lastAnchor = self.valueText
+        relativePoint = "BOTTOMLEFT"
+        xOffset = 0
+        yOffset = -8
+        
+        height = height + 28
+        isFirst = false
+    end
+    
+    -- 6. News Feed
+    if showFeed then
+        if not isFirst then
+            yOffset = -8
+            height = height + 8
+        else
+            yOffset = -26
+        end
+        self.newsText:SetPoint("TOPLEFT", lastAnchor, relativePoint, xOffset, yOffset)
+        lastAnchor = self.newsText
+        relativePoint = "BOTTOMLEFT"
+        xOffset = 0
+        yOffset = -8
+        
+        height = height + 24
+        isFirst = false
+    end
+    
+    -- Set final frame height
+    if isFirst then
+        self.frame:SetHeight(40)
+    else
+        self.frame:SetHeight(height + 12)
+    end
 end
 
 function ShellcoinTicker.UI:UpdateDisplay()
     if not self.frame or not ShellcoinTickerDB then return end
     
-    local price = ShellcoinTickerDB.price or 100000
+    -- Update layout to match current settings
+    self:LayoutHUD()
+    
+    -- Update minimap button icon dynamically once cached
+    self:UpdateMinimapIcon()
+    
+    local price = ShellcoinTickerDB.price or 0
     local change = ShellcoinTickerDB.change or 0
     
-    -- Format price and change
-    local priceStr = ShellcoinTicker:FormatMoney(price)
+    -- Calculate and Display Financial Analytics (Invested & Profit/Loss)
+    local totalInvested, profitLoss, profitLossPercent, costBasis = ShellcoinTicker:CalculateProfitLoss()
+    
+    local investedStr = ShellcoinTicker:FormatMoney(totalInvested)
+    self.investedText:SetText("Invested: " .. investedStr)
+    
+    local plColor = "|cff00ff00" -- green
+    local plSign = "+"
+    if profitLoss < 0 then
+        plColor = "|cffff0000" -- red
+        plSign = "-"
+    elseif profitLoss == 0 then
+        plColor = "|cff888888" -- gray
+        plSign = ""
+    end
+    
+    local formattedPL = ShellcoinTicker:FormatMoney(math.abs(profitLoss))
+    if profitLoss < 0 then
+        formattedPL = "-" .. formattedPL
+    elseif profitLoss > 0 then
+        formattedPL = "+" .. formattedPL
+    end
+    
+    local plPercentStr = plColor .. plSign .. string.format("%.1f%%", math.abs(profitLossPercent)) .. "|r"
+    self.profitLossText:SetText("Profit/Loss: " .. plColor .. formattedPL .. " (" .. plPercentStr .. ")|r")
+    
+    -- Format current market price and change
+    local buyPrice = ShellcoinTickerDB.buyPrice
+    local sellPrice = ShellcoinTickerDB.sellPrice
+    local priceStr
+    if buyPrice and sellPrice then
+        priceStr = "Buy: " .. ShellcoinTicker:FormatMoney(buyPrice) .. " | Sell: " .. ShellcoinTicker:FormatMoney(sellPrice)
+    else
+        priceStr = "Market Price: " .. ShellcoinTicker:FormatMoney(price)
+    end
+    
     local changeSign = "+"
     local changeColor = "|cff00ff00" -- green
     if change < 0 then
@@ -172,15 +678,32 @@ function ShellcoinTicker.UI:UpdateDisplay()
     end
     
     local changeStr = changeColor .. changeSign .. string.format("%.1f%%", change * 100) .. "|r"
-    self.priceText:SetText("Price: " .. priceStr .. " (" .. changeStr .. ")")
+    self.priceText:SetText(priceStr .. " (" .. changeStr .. ")")
     
     -- Build trend sparkline using safe characters
     local trendStr = "Trend: "
     local history = ShellcoinTickerDB.history
-    if history and table.getn(history) > 1 then
-        for i = 2, table.getn(history) do
-            local prev = history[i-1]
-            local curr = history[i]
+    local numPoints = history and table.getn(history) or 0
+    
+    -- Filter out 0-price placeholders for sparkline and graph to avoid skewed scaling
+    local activeHistory = {}
+    if history then
+        for i = 1, numPoints do
+            local entry = history[i]
+            if entry and type(entry) == "table" and entry.price and entry.price > 0 then
+                table.insert(activeHistory, entry)
+            end
+        end
+    end
+    local numActivePoints = table.getn(activeHistory)
+    
+    if numActivePoints > 1 then
+        local startIdx = math.max(2, numActivePoints - 19)
+        for i = startIdx, numActivePoints do
+            local prevEntry = activeHistory[i-1]
+            local currEntry = activeHistory[i]
+            local prev = prevEntry.price or 0
+            local curr = currEntry.price or 0
             if curr > prev then
                 trendStr = trendStr .. " |cff00ff00^|r"
             elseif curr < prev then
@@ -194,18 +717,18 @@ function ShellcoinTicker.UI:UpdateDisplay()
     end
     self.trendText:SetText(trendStr)
     
-    -- Format holdings
-    local auth = ShellcoinTicker.authenticCount or 0
-    local fake = ShellcoinTicker.counterfeitCount or 0
-    self.holdingsText:SetText("HODL: |cffffffff" .. auth .. "|r Auth | |cff9d9d9d" .. fake .. "|r Counterfeit")
+    -- Update Graph Chart (delegated to UI_Graph.lua)
+    self:UpdateGraph()
     
-    -- Calculate total value (only authentic counts, counterfeit is worthless grey junk)
+    -- Format holdings
+    local bags = ShellcoinTicker.bagsCount or 0
+    local bank = ShellcoinTicker.bankCount or 0
+    local auth = bags + bank
+    self.holdingsText:SetText("HODL: |cffffffff" .. auth .. "|r SHELL (Bags: " .. bags .. ", Bank: " .. bank .. ")")
+    
+    -- Calculate total value
     local totalValue = auth * price
-    local totalValueStr = ShellcoinTicker:FormatMoney(totalValue)
-    if fake > 0 then
-        totalValueStr = totalValueStr .. " (|cff9d9d9d" .. fake .. " fake worthless|r)"
-    end
-    self.valueText:SetText("Net Worth: " .. totalValueStr)
+    self.valueText:SetText("Net Worth: " .. ShellcoinTicker:FormatMoney(totalValue))
     
     -- Update news feed
     self.newsText:SetText("|cffffd700Feed:|r " .. (ShellcoinTicker.lastEventMsg or "HODL!"))

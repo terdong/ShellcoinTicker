@@ -7,3 +7,6 @@
 
 Core.lua
 UI.lua
+UI_Graph.lua
+UI_Minimap.lua
+UI_Options.lua
