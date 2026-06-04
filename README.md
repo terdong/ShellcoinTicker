@@ -8,6 +8,10 @@
 | :---: | :---: |
 | ![HUD Display](Screenshots/HUD.png) | ![Options Window](Screenshots/Options.png) |
 
+| Graph Price Tooltip | Trend Sparkline History | HODL Breakdown |
+| :---: | :---: | :---: |
+| ![Graph Price Tooltip](Screenshots/Graph_Tooltip.png) | ![Trend Sparkline History](Screenshots/Trend_Tooltip.png) | ![HODL Breakdown](Screenshots/HODL_Tooltip.png) |
+
 ---
 
 ## Features
@@ -15,10 +19,12 @@
 ### 1. Sleek HUD Frame
 - **Interactive Glassmorphism Layout**: A semi-transparent dark UI accented with a luxurious gold border.
 - **Dynamic Y-Axis Collapsing Layout**: Toggle individual component blocks on or off via options. The HUD automatically rearranges itself and recalculates its height on-the-fly to eliminate empty vertical gaps.
-- **Tooltip Breakdown**: Hovering over the HODL counts displays a breakdown of your Shellcoins across bag and bank containers for your current character, other characters on the same realm, and other realms.
+- **HODL Tooltip Breakdown**: Hovering over the HODL counts displays a detailed breakdown of your Shellcoins across bag and bank containers for your current character, other characters on the same realm, and other realms.
+- **Trend Sparkline Tooltip**: Hovering over the Trend Sparkline displays a scrollable list of the last 20 price ticks, including timestamps, absolute prices, and change percentages.
 
 ### 2. Multi-Mode Graphing & Sparkline
 - **Two Charting Styles**: Switch between a sleek **Area Chart** and a traditional **Candlestick Chart** (tracking open, close, high, low intervals).
+- **Interactive Graph Tooltips**: Hovering over any coordinate/candle on the graph displays a vertical highlight guide line, highlights the selected dot (in Area Mode), and opens a detailed tooltip listing exact time, price, and price difference.
 - **Timeframe Filtering**: Select between **1H (Hour)**, **1D (Day)**, **1W (Week)**, **1Mo (Month)**, and **1Y (Year)** historical scales.
 - **Trend Sparkline**: Displays a quick rolling text trend history (e.g., `^`, `v`, `-`) using plain-text characters.
 

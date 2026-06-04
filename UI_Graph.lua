@@ -8,11 +8,17 @@ function ShellcoinTicker.UI:UpdateGraph()
     -- Hide all graph elements first
     for i = 1, 15 do
         self.graphDots[i]:Hide()
+        if self.graphHoverFrames and self.graphHoverFrames[i] then
+            self.graphHoverFrames[i]:Hide()
+        end
     end
     for i = 1, 14 do
         self.graphHLines[i]:Hide()
         self.graphVLines[i]:Hide()
         self.graphBars[i]:Hide()
+    end
+    if self.graphHighlightLine then
+        self.graphHighlightLine:Hide()
     end
     
     local price = ShellcoinTickerDB.price or 0
@@ -182,6 +188,27 @@ function ShellcoinTicker.UI:UpdateGraph()
             body:SetHeight(math.max(2, yTop - yBottom))
             body:SetTexture(r, g, b, 0.9)
             body:Show()
+
+            -- 3. Hover Frame
+            local hf = self.graphHoverFrames[i]
+            if hf then
+                local iStart = startTime + (i - 1) * intervalWidth
+                local iEnd = startTime + i * intervalWidth
+                hf:ClearAllPoints()
+                hf:SetWidth(candleWidth)
+                hf:SetHeight(graphHeight)
+                hf:SetPoint("CENTER", self.graphFrame, "BOTTOMLEFT", x, graphHeight / 2)
+                hf.isCandle = true
+                hf.startTime = iStart
+                hf.endTime = iEnd
+                hf.open = c.open
+                hf.close = c.close
+                hf.high = c.high
+                hf.low = c.low
+                hf.x = x
+                hf.dot = nil
+                hf:Show()
+            end
         end
         
     else
@@ -251,14 +278,17 @@ function ShellcoinTicker.UI:UpdateGraph()
             end
             
             local lastX, lastY
+            local sliceWidth = drawWidth / math.max(1, graphPointsCount - 1)
             for i = 1, graphPointsCount do
                 local p = points[i].price
                 local t = points[i].time
                 local x = paddingX + ((t - cutoff) / duration) * drawWidth
                 local y = GetY(p)
                 
-                -- Keep dots hidden
+                -- Keep dots hidden, but position them so they can be shown on hover
                 local dot = self.graphDots[i]
+                dot:ClearAllPoints()
+                dot:SetPoint("CENTER", self.graphFrame, "BOTTOMLEFT", x, y)
                 dot:Hide()
                 
                 -- Draw connectors and fill area
@@ -303,6 +333,22 @@ function ShellcoinTicker.UI:UpdateGraph()
                     bar:SetHeight(math.max(1, lastY - paddingY))
                     bar:SetGradientAlpha("VERTICAL", rL, gL, bL, 0.02, rL, gL, bL, 0.30)
                     bar:Show()
+                end
+
+                -- Position hover frame
+                local hf = self.graphHoverFrames[i]
+                if hf then
+                    hf:ClearAllPoints()
+                    hf:SetWidth(sliceWidth)
+                    hf:SetHeight(graphHeight)
+                    hf:SetPoint("CENTER", self.graphFrame, "BOTTOMLEFT", x, graphHeight / 2)
+                    hf.isCandle = false
+                    hf.time = t
+                    hf.price = p
+                    hf.prevPrice = (i > 1) and points[i-1].price or nil
+                    hf.x = x
+                    hf.dot = dot
+                    hf:Show()
                 end
                 
                 lastX, lastY = x, y
