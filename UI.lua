@@ -201,11 +201,11 @@ function ShellcoinTicker.UI:CreateMainFrame()
                 local percent = (prev > 0) and ((diff / prev) * 100) or 0
                 local changeText
                 if diff > 0 then
-                    changeText = "|cff00ff00+" .. string.format("%.1f%%", percent) .. "|r"
+                    changeText = "|cff00ff00+" .. string.format("%.2f%%", percent) .. "|r"
                 elseif diff < 0 then
-                    changeText = "|cffff0000-" .. string.format("%.1f%%", math.abs(percent)) .. "|r"
+                    changeText = "|cffff0000-" .. string.format("%.2f%%", math.abs(percent)) .. "|r"
                 else
-                    changeText = "|cff8888880.0%|r"
+                    changeText = "|cff8888880.00%|r"
                 end
                 
                 local timeStr = date("%m/%d %H:%M", t)
