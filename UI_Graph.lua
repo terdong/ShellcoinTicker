@@ -231,11 +231,13 @@ function ShellcoinTicker.UI:UpdateGraph()
         table.insert(tempPoints, { time = cutoff, price = priceAtCutoff })
         for i = 1, table.getn(filtered) do
             local t = filtered[i].time
-            if t > cutoff and t < refTime then
+            if t > cutoff and t <= refTime then
                 table.insert(tempPoints, { time = t, price = filtered[i].price })
             end
         end
-        table.insert(tempPoints, { time = refTime, price = price })
+        if ShellcoinTickerDB.mockMode then
+            table.insert(tempPoints, { time = refTime, price = price })
+        end
         
         -- Downsample tempPoints to at most 15 points (keeping boundary points intact)
         local points = {}
