@@ -115,6 +115,7 @@ function ShellcoinTicker:InitializeDB()
     local mt = {
         __index = function(t, key)
             local r = GetRealmName()
+            if not r or r == "" then return nil end
             local rTable = rawget(t, r)
             if not rTable then
                 rTable = {}
@@ -124,6 +125,7 @@ function ShellcoinTicker:InitializeDB()
         end,
         __newindex = function(t, key, val)
             local r = GetRealmName()
+            if not r or r == "" then return end
             local rTable = rawget(t, r)
             if not rTable then
                 rTable = {}
@@ -436,9 +438,18 @@ function ShellcoinTicker:UpdateHistoryAndChange(price)
         local lastPrice = lastEntry.price or 0
         local lastTime = lastEntry.time or 0
         if price == lastPrice then
-            -- If price is identical, only record if at least 10 minutes (600s) have passed
-            if time() - lastTime < 600 then
-                shouldInsert = false
+            -- If price is identical, only record if at least 10 minutes (600s) have passed in mock mode.
+            -- In live server sync mode, we only record the FIRST identical price to show a flat trend segment ('-'),
+            -- and suppress subsequent identical prices to avoid spamming the history.
+            if ShellcoinTickerDB.mockMode then
+                if time() - lastTime < 600 then
+                    shouldInsert = false
+                end
+            else
+                local secondLastEntry = numEntries > 1 and ShellcoinTickerDB.history[numEntries - 1]
+                if secondLastEntry and type(secondLastEntry) == "table" and secondLastEntry.price == lastPrice then
+                    shouldInsert = false
+                end
             end
         elseif (time() - lastTime < 60) then
             -- Limit history updates to at most once per 60 seconds to prevent file bloat in both modes
