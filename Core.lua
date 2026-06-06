@@ -11,6 +11,7 @@ ShellcoinTicker = {
     speedrunMode = false,
     lastEventMsg = "Market is stable. HODL!",
     isSilentSync = false,
+    initialSyncDone = false,
 
     -- List of funny simulated market events
     Events = {
@@ -527,6 +528,26 @@ function ShellcoinTicker:ProcessChatMessage(msg)
     end
 end
 
+-- Check and trigger initial price sync on login if difference exceeds syncInterval
+function ShellcoinTicker:CheckAndTriggerInitialSync()
+    if not ShellcoinTickerDB then return end
+    local syncInterval = ShellcoinTickerDB.syncInterval or 600
+    if syncInterval > 0 and not ShellcoinTickerDB.mockMode and not ShellcoinTicker.speedrunMode then
+        local history = ShellcoinTickerDB.history
+        local lastTime = 0
+        if history and table.getn(history) > 0 then
+            local lastEntry = history[table.getn(history)]
+            if lastEntry and type(lastEntry) == "table" and lastEntry.time then
+                lastTime = lastEntry.time
+            end
+        end
+        if time() - lastTime > syncInterval then
+            ShellcoinTicker.isSilentSync = true
+            SendChatMessage(".shellcoin", "SAY")
+        end
+    end
+end
+
 -- Event Handler function
 local function OnEvent()
     if event == "ADDON_LOADED" and arg1 == "ShellcoinTicker" then
@@ -539,7 +560,24 @@ local function OnEvent()
 
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cff00ff00ShellcoinTicker loaded! Type /sct or /shellcointicker to toggle the HUD.|r")
-    elseif event == "BAG_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        ShellcoinTicker.scanPending = true
+        if not ShellcoinTicker.initialSyncDone then
+            ShellcoinTicker.initialSyncDone = true
+            
+            -- Delayed check to ensure server chat connection is fully ready
+            local loginTimer = 0
+            this:SetScript("OnUpdate", function()
+                local elapsed = arg1
+                if not elapsed then return end
+                loginTimer = loginTimer + elapsed
+                if loginTimer >= 2.0 then
+                    this:SetScript("OnUpdate", nil)
+                    ShellcoinTicker:CheckAndTriggerInitialSync()
+                end
+            end)
+        end
+    elseif event == "BAG_UPDATE" then
         ShellcoinTicker.scanPending = true
     elseif event == "BANKFRAME_OPENED" then
         ShellcoinTicker.isBankOpen = true
