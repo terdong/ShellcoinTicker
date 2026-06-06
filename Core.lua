@@ -590,7 +590,7 @@ local function OnEvent()
                 ShellcoinTicker.UI:UpdateMinimapIcon()
             end
         end
-    elseif string.find(event or "", "^CHAT_MSG") then
+    elseif event == "CHAT_MSG_SYSTEM" then
         ShellcoinTicker:ProcessChatMessage(arg1)
     end
 end
@@ -604,12 +604,6 @@ eventFrame:RegisterEvent("BANKFRAME_OPENED")
 eventFrame:RegisterEvent("BANKFRAME_CLOSED")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
-eventFrame:RegisterEvent("CHAT_MSG_SAY")
-eventFrame:RegisterEvent("CHAT_MSG_YELL")
-eventFrame:RegisterEvent("CHAT_MSG_CHANNEL")
-eventFrame:RegisterEvent("CHAT_MSG_GUILD")
-eventFrame:RegisterEvent("CHAT_MSG_MONSTER_SAY")
-eventFrame:RegisterEvent("CHAT_MSG_MONSTER_YELL")
 eventFrame:SetScript("OnEvent", OnEvent)
 
 -- Parse money string like "99g 99s 99c" or raw copper numbers
