@@ -270,6 +270,38 @@ function ShellcoinTicker.UI:CreateMainFrame()
     })
     graphFrame:SetBackdropColor(0, 0, 0, 0.5) -- darker inner background
     graphFrame:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.4)
+    graphFrame:EnableMouse(true)
+    graphFrame:RegisterForDrag("LeftButton")
+    graphFrame:SetScript("OnDragStart", function()
+        this:GetParent():StartMoving()
+    end)
+    graphFrame:SetScript("OnDragStop", function()
+        this:GetParent():StopMovingOrSizing()
+        local parent = this:GetParent()
+        local point, _, relativePoint, xOfs, yOfs = parent:GetPoint()
+        if ShellcoinTickerDB then
+            ShellcoinTickerDB.point = point
+            ShellcoinTickerDB.x = xOfs
+            ShellcoinTickerDB.y = yOfs
+        end
+    end)
+    graphFrame:SetScript("OnEnter", function()
+        this:SetScript("OnUpdate", ShellcoinTicker.UI.Graph_OnUpdate)
+    end)
+    graphFrame:SetScript("OnLeave", function()
+        this:SetScript("OnUpdate", nil)
+        GameTooltip:Hide()
+        local ui = ShellcoinTicker.UI
+        if ui.graphHighlightLine then
+            ui.graphHighlightLine:Hide()
+        end
+        if ui.graphDots then
+            for i = 1, 15 do
+                ui.graphDots[i]:Hide()
+            end
+        end
+        ui.activeGraphIndex = nil
+    end)
     self.graphFrame = graphFrame
 
     -- Graph Min/Max overlay texts
@@ -325,89 +357,13 @@ function ShellcoinTicker.UI:CreateMainFrame()
     highlightLine:Hide()
     self.graphHighlightLine = highlightLine
 
-    -- Hover frames for tooltip interactivity
+    -- Hover frames for tooltip interactivity (data structures only)
     self.graphHoverFrames = {}
     for i = 1, 15 do
         local hf = CreateFrame("Frame", nil, graphFrame)
-        hf:EnableMouse(true)
+        hf:EnableMouse(false)
         hf:SetFrameLevel(graphFrame:GetFrameLevel() + 5)
         hf:Hide()
-
-        hf:SetScript("OnEnter", function()
-            -- Set up tooltip
-            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-            GameTooltip:ClearLines()
-            
-            if this.isCandle then
-                GameTooltip:AddLine("Candle Details", 1, 0.82, 0)
-                GameTooltip:AddLine(" ")
-                -- Format time range
-                local startTimeStr = date("%m/%d %H:%M", this.startTime)
-                local endTimeStr = date("%m/%d %H:%M", this.endTime)
-                GameTooltip:AddDoubleLine("Time Range:", startTimeStr .. " - " .. endTimeStr, 1, 1, 1, 1, 1, 1)
-                GameTooltip:AddDoubleLine("Open:", ShellcoinTicker:FormatMoney(this.open), 1, 1, 1, 1, 1, 1)
-                GameTooltip:AddDoubleLine("Close:", ShellcoinTicker:FormatMoney(this.close), 1, 1, 1, 1, 1, 1)
-                GameTooltip:AddDoubleLine("High:", ShellcoinTicker:FormatMoney(this.high), 1, 1, 1, 1, 1, 1)
-                GameTooltip:AddDoubleLine("Low:", ShellcoinTicker:FormatMoney(this.low), 1, 1, 1, 1, 1, 1)
-                
-                local diff = this.close - this.open
-                local percent = (this.open > 0) and ((diff / this.open) * 100) or 0
-                local changeText
-                if diff > 0 then
-                    changeText = "|cff00ff00+" .. ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
-                elseif diff < 0 then
-                    changeText = "|cffff0000-" .. ShellcoinTicker:FormatMoney(math.abs(diff)) .. " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
-                else
-                    changeText = "|cff8888880.0%|r"
-                end
-                GameTooltip:AddDoubleLine("Change:", changeText, 1, 1, 1, 1, 1, 1)
-            else
-                GameTooltip:AddLine("Price Details", 1, 0.82, 0)
-                GameTooltip:AddLine(" ")
-                GameTooltip:AddDoubleLine("Time:", date("%Y/%m/%d %H:%M", this.time), 1, 1, 1, 1, 1, 1)
-                GameTooltip:AddDoubleLine("Price:", ShellcoinTicker:FormatMoney(this.price), 1, 1, 1, 1, 1, 1)
-                
-                if this.prevPrice and this.prevPrice > 0 then
-                    local diff = this.price - this.prevPrice
-                    local percent = (diff / this.prevPrice) * 100
-                    local changeText
-                    if diff > 0 then
-                        changeText = "|cff00ff00+" .. ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
-                    elseif diff < 0 then
-                        changeText = "|cffff0000-" .. ShellcoinTicker:FormatMoney(math.abs(diff)) .. " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
-                    else
-                        changeText = "|cff8888880.0%|r"
-                    end
-                    GameTooltip:AddDoubleLine("Change:", changeText, 1, 1, 1, 1, 1, 1)
-                end
-            end
-            
-            GameTooltip:Show()
-
-            -- Show visual cues
-            if this.dot then
-                this.dot:Show()
-            end
-            local ui = ShellcoinTicker.UI
-            if ui.graphHighlightLine and this.x then
-                ui.graphHighlightLine:ClearAllPoints()
-                ui.graphHighlightLine:SetPoint("TOPLEFT", ui.graphFrame, "TOPLEFT", this.x, -8)
-                ui.graphHighlightLine:SetPoint("BOTTOMLEFT", ui.graphFrame, "BOTTOMLEFT", this.x, 8)
-                ui.graphHighlightLine:Show()
-            end
-        end)
-
-        hf:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-            if this.dot then
-                this.dot:Hide()
-            end
-            local ui = ShellcoinTicker.UI
-            if ui.graphHighlightLine then
-                ui.graphHighlightLine:Hide()
-            end
-        end)
-
         table.insert(self.graphHoverFrames, hf)
     end
 

@@ -450,6 +450,7 @@ function ShellcoinTicker:UpdateHistoryAndChange(price)
                 local secondLastEntry = numEntries > 1 and ShellcoinTickerDB.history[numEntries - 1]
                 if secondLastEntry and type(secondLastEntry) == "table" and secondLastEntry.price == lastPrice then
                     shouldInsert = false
+                    lastEntry.time = time() -- Update the timestamp of the last entry to the latest sync time
                 end
             end
         elseif (time() - lastTime < 60) then
