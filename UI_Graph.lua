@@ -3,7 +3,7 @@
 
 function ShellcoinTicker.UI:UpdateGraph()
     if not self.frame or not ShellcoinTickerDB then return end
-    
+
     -- Redraw Line Graph
     -- Hide all graph elements first
     for i = 1, 15 do
@@ -20,11 +20,11 @@ function ShellcoinTicker.UI:UpdateGraph()
     if self.graphHighlightLine then
         self.graphHighlightLine:Hide()
     end
-    
+
     local price = ShellcoinTickerDB.price or 0
     local history = ShellcoinTickerDB.history
     local numPoints = history and table.getn(history) or 0
-    
+
     -- Filter out 0-price placeholders for sparkline and graph to avoid skewed scaling
     local activeHistory = {}
     if history then
@@ -36,7 +36,7 @@ function ShellcoinTicker.UI:UpdateGraph()
         end
     end
     local numActivePoints = table.getn(activeHistory)
-    
+
     -- Filter history based on selected timeframe
     local tf = ShellcoinTickerDB.selectedTimeframe
     if tf == "10m" or not tf then
@@ -53,18 +53,25 @@ function ShellcoinTicker.UI:UpdateGraph()
     elseif tf == "1y" then
         duration = 31536000
     end
-    
-    local refTime = ShellcoinTicker.speedrunMode and ShellcoinTicker.virtualTime or time()
+
+    local refTime = time()
+    if ShellcoinTicker.speedrunMode then
+        refTime = ShellcoinTicker.virtualTime
+    elseif not ShellcoinTickerDB.mockMode then
+        if numActivePoints > 0 then
+            refTime = activeHistory[numActivePoints].time or time()
+        end
+    end
     local cutoff = refTime - duration
     local filtered = {}
-    
+
     for i = 1, numActivePoints do
         local entry = activeHistory[i]
         if entry.time and entry.time >= cutoff and entry.time <= refTime then
             table.insert(filtered, entry)
         end
     end
-    
+
     -- Dimensions of drawing area inside the 256x60 graphFrame
     local graphWidth = 256
     local graphHeight = 60
@@ -72,18 +79,18 @@ function ShellcoinTicker.UI:UpdateGraph()
     local paddingY = 8
     local drawWidth = graphWidth - (paddingX * 2)
     local drawHeight = graphHeight - (paddingY * 2)
-    
+
     local graphMode = ShellcoinTickerDB.graphMode or "area"
-    
+
     if graphMode == "candle" then
         -- 1. CANDLESTICK GRAPH MODE (14 Candles)
         local startTime = cutoff
         local endTime = refTime
         local intervalWidth = (endTime - startTime) / 14
-        
+
         local candles = {}
         local lastKnownPrice = price
-        
+
         -- Find the last price before cutoff
         for i = numActivePoints, 1, -1 do
             local entry = activeHistory[i]
@@ -92,11 +99,11 @@ function ShellcoinTicker.UI:UpdateGraph()
                 break
             end
         end
-        
+
         for i = 1, 14 do
             local iStart = startTime + (i - 1) * intervalWidth
             local iEnd = startTime + i * intervalWidth
-            
+
             -- Find points in this interval
             local intervalPoints = {}
             for j = 1, table.getn(filtered) do
@@ -105,7 +112,7 @@ function ShellcoinTicker.UI:UpdateGraph()
                     table.insert(intervalPoints, filtered[j].price)
                 end
             end
-            
+
             local c = {}
             if table.getn(intervalPoints) > 0 then
                 c.open = intervalPoints[1]
@@ -127,7 +134,7 @@ function ShellcoinTicker.UI:UpdateGraph()
             end
             table.insert(candles, c)
         end
-        
+
         -- Find overall min/max prices of all wicks
         local minPrice = candles[1].low
         local maxPrice = candles[1].high
@@ -135,32 +142,32 @@ function ShellcoinTicker.UI:UpdateGraph()
             if candles[i].low < minPrice then minPrice = candles[i].low end
             if candles[i].high > maxPrice then maxPrice = candles[i].high end
         end
-        
+
         -- Pad flat range to avoid division by zero
         if minPrice == maxPrice then
             minPrice = math.max(0, minPrice - 100)
             maxPrice = maxPrice + 100
         end
-        
+
         self.graphMaxText:SetText("Max: " .. ShellcoinTicker:FormatMoney(maxPrice))
         self.graphMinText:SetText("Min: " .. ShellcoinTicker:FormatMoney(minPrice))
         self.graphMaxText:Show()
         self.graphMinText:Show()
-        
+
         local function GetY(p)
             return paddingY + ((p - minPrice) / (maxPrice - minPrice)) * drawHeight
         end
-        
+
         local candleWidth = drawWidth / 14
         for i = 1, 14 do
             local c = candles[i]
             local x = paddingX + (i - 1) * candleWidth + (candleWidth / 2)
-            
+
             local yOpen = GetY(c.open)
             local yClose = GetY(c.close)
             local yHigh = GetY(c.high)
             local yLow = GetY(c.low)
-            
+
             -- Color code: Green (rise), Red (fall), Gray (flat)
             local r, g, b = 0.6, 0.6, 0.6
             if c.close > c.open then
@@ -168,7 +175,7 @@ function ShellcoinTicker.UI:UpdateGraph()
             elseif c.close < c.open then
                 r, g, b = 1.0, 0.2, 0.2 -- Bearish red
             end
-            
+
             -- 1. Wick (VLine)
             local wick = self.graphVLines[i]
             wick:ClearAllPoints()
@@ -177,7 +184,7 @@ function ShellcoinTicker.UI:UpdateGraph()
             wick:SetHeight(math.max(1, yHigh - yLow))
             wick:SetTexture(r, g, b, 0.8)
             wick:Show()
-            
+
             -- 2. Body (HLines repurposed as the body box)
             local body = self.graphHLines[i]
             body:ClearAllPoints()
@@ -210,7 +217,6 @@ function ShellcoinTicker.UI:UpdateGraph()
                 hf:Show()
             end
         end
-        
     else
         -- 2. AREA GRAPH MODE (WITH RISE/FALL COLOR CODING)
         -- Determine boundary price at the cutoff time
@@ -225,7 +231,7 @@ function ShellcoinTicker.UI:UpdateGraph()
                 break
             end
         end
-        
+
         -- Build raw points covering full boundary from cutoff to refTime without duplicates
         local tempPoints = {}
         table.insert(tempPoints, { time = cutoff, price = priceAtCutoff })
@@ -237,7 +243,7 @@ function ShellcoinTicker.UI:UpdateGraph()
         end
         -- Always insert the current price at the current time to extend the graph to the rightmost edge
         table.insert(tempPoints, { time = refTime, price = price })
-        
+
         -- Downsample tempPoints to at most 15 points (keeping boundary points intact)
         local points = {}
         local N = table.getn(tempPoints)
@@ -252,9 +258,9 @@ function ShellcoinTicker.UI:UpdateGraph()
                 table.insert(points, tempPoints[index])
             end
         end
-        
+
         local graphPointsCount = table.getn(points)
-        
+
         if graphPointsCount > 0 then
             local minPrice = points[1].price
             local maxPrice = points[1].price
@@ -262,22 +268,22 @@ function ShellcoinTicker.UI:UpdateGraph()
                 if points[i].price < minPrice then minPrice = points[i].price end
                 if points[i].price > maxPrice then maxPrice = points[i].price end
             end
-            
+
             -- Pad flat range
             if minPrice == maxPrice then
                 minPrice = math.max(0, minPrice - 100)
                 maxPrice = maxPrice + 100
             end
-            
+
             self.graphMaxText:SetText("Max: " .. ShellcoinTicker:FormatMoney(maxPrice))
             self.graphMinText:SetText("Min: " .. ShellcoinTicker:FormatMoney(minPrice))
             self.graphMaxText:Show()
             self.graphMinText:Show()
-            
+
             local function GetY(p)
                 return paddingY + ((p - minPrice) / (maxPrice - minPrice)) * drawHeight
             end
-            
+
             local lastX, lastY
             local sliceWidth = drawWidth / math.max(1, graphPointsCount - 1)
             for i = 1, graphPointsCount do
@@ -285,34 +291,34 @@ function ShellcoinTicker.UI:UpdateGraph()
                 local t = points[i].time
                 local x = paddingX + ((t - cutoff) / duration) * drawWidth
                 local y = GetY(p)
-                
+
                 -- Keep dots hidden, but position them so they can be shown on hover
                 local dot = self.graphDots[i]
                 dot:ClearAllPoints()
                 dot:SetPoint("CENTER", self.graphFrame, "BOTTOMLEFT", x, y)
                 dot:Hide()
-                
+
                 -- Draw connectors and fill area
                 if i > 1 then
-                    local prevP = points[i-1].price
+                    local prevP = points[i - 1].price
                     local rL, gL, bL = 0.6, 0.6, 0.6 -- Gray default
                     if p > prevP then
-                        rL, gL, bL = 0.0, 1.0, 0.2 -- Green rise
+                        rL, gL, bL = 0.0, 1.0, 0.2   -- Green rise
                     elseif p < prevP then
-                        rL, gL, bL = 1.0, 0.2, 0.2 -- Red fall
+                        rL, gL, bL = 1.0, 0.2, 0.2   -- Red fall
                     end
-                    
+
                     -- Horizontal segment (+1 to width to eliminate corner gaps)
-                    local hline = self.graphHLines[i-1]
+                    local hline = self.graphHLines[i - 1]
                     hline:ClearAllPoints()
                     hline:SetPoint("BOTTOMLEFT", self.graphFrame, "BOTTOMLEFT", lastX, lastY)
                     hline:SetWidth(x - lastX + 1)
                     hline:SetHeight(1.5)
                     hline:SetTexture(rL, gL, bL, 0.8)
                     hline:Show()
-                    
+
                     -- Vertical segment
-                    local vline = self.graphVLines[i-1]
+                    local vline = self.graphVLines[i - 1]
                     local yMin = math.min(lastY, y)
                     local yMax = math.max(lastY, y)
                     if yMax - yMin > 0.5 then
@@ -325,9 +331,9 @@ function ShellcoinTicker.UI:UpdateGraph()
                     else
                         vline:Hide()
                     end
-                    
+
                     -- Shaded area fill underneath (+1 to width to eliminate corner gaps)
-                    local bar = self.graphBars[i-1]
+                    local bar = self.graphBars[i - 1]
                     bar:ClearAllPoints()
                     bar:SetPoint("BOTTOMLEFT", self.graphFrame, "BOTTOMLEFT", lastX, paddingY)
                     bar:SetWidth(x - lastX + 1)
@@ -346,12 +352,12 @@ function ShellcoinTicker.UI:UpdateGraph()
                     hf.isCandle = false
                     hf.time = t
                     hf.price = p
-                    hf.prevPrice = (i > 1) and points[i-1].price or nil
+                    hf.prevPrice = (i > 1) and points[i - 1].price or nil
                     hf.x = x
                     hf.dot = dot
                     hf:Show()
                 end
-                
+
                 lastX, lastY = x, y
             end
         else
@@ -366,10 +372,10 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
     local scale = ui.graphFrame:GetEffectiveScale()
     local left = ui.graphFrame:GetLeft()
     if not left then return end
-    
+
     local xpos, ypos = GetCursorPosition()
     local mouseX = (xpos / scale) - left
-    
+
     local numActive = 0
     for i = 1, 15 do
         if ui.graphHoverFrames[i] and ui.graphHoverFrames[i]:IsShown() then
@@ -378,12 +384,12 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
             break
         end
     end
-    
+
     if numActive == 0 then return end
-    
+
     local closestIndex = nil
     local minDistance = 999999
-    
+
     for i = 1, numActive do
         local hf = ui.graphHoverFrames[i]
         if hf and hf.x then
@@ -394,17 +400,17 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
             end
         end
     end
-    
+
     if not closestIndex then return end
-    
+
     if closestIndex ~= ui.activeGraphIndex then
         ui.activeGraphIndex = closestIndex
-        
+
         local hf = ui.graphHoverFrames[closestIndex]
-        
+
         GameTooltip:SetOwner(ui.graphFrame, "ANCHOR_RIGHT")
         GameTooltip:ClearLines()
-        
+
         if hf.isCandle then
             GameTooltip:AddLine("Candle Details", 1, 0.82, 0)
             GameTooltip:AddLine(" ")
@@ -415,14 +421,17 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
             GameTooltip:AddDoubleLine("Close:", ShellcoinTicker:FormatMoney(hf.close), 1, 1, 1, 1, 1, 1)
             GameTooltip:AddDoubleLine("High:", ShellcoinTicker:FormatMoney(hf.high), 1, 1, 1, 1, 1, 1)
             GameTooltip:AddDoubleLine("Low:", ShellcoinTicker:FormatMoney(hf.low), 1, 1, 1, 1, 1, 1)
-            
+
             local diff = hf.close - hf.open
             local percent = (hf.open > 0) and ((diff / hf.open) * 100) or 0
             local changeText
             if diff > 0 then
-                changeText = "|cff00ff00+" .. ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
+                changeText = "|cff00ff00+" ..
+                ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
             elseif diff < 0 then
-                changeText = "|cffff0000-" .. ShellcoinTicker:FormatMoney(math.abs(diff)) .. " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
+                changeText = "|cffff0000-" ..
+                ShellcoinTicker:FormatMoney(math.abs(diff)) ..
+                " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
             else
                 changeText = "|cff8888880.0%|r"
             end
@@ -432,24 +441,27 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
             GameTooltip:AddLine(" ")
             GameTooltip:AddDoubleLine("Time:", date("%Y/%m/%d %H:%M", hf.time), 1, 1, 1, 1, 1, 1)
             GameTooltip:AddDoubleLine("Price:", ShellcoinTicker:FormatMoney(hf.price), 1, 1, 1, 1, 1, 1)
-            
+
             if hf.prevPrice and hf.prevPrice > 0 then
                 local diff = hf.price - hf.prevPrice
                 local percent = (diff / hf.prevPrice) * 100
                 local changeText
                 if diff > 0 then
-                    changeText = "|cff00ff00+" .. ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
+                    changeText = "|cff00ff00+" ..
+                    ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
                 elseif diff < 0 then
-                    changeText = "|cffff0000-" .. ShellcoinTicker:FormatMoney(math.abs(diff)) .. " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
+                    changeText = "|cffff0000-" ..
+                    ShellcoinTicker:FormatMoney(math.abs(diff)) ..
+                    " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
                 else
                     changeText = "|cff8888880.0%|r"
                 end
                 GameTooltip:AddDoubleLine("Change:", changeText, 1, 1, 1, 1, 1, 1)
             end
         end
-        
+
         GameTooltip:Show()
-        
+
         for i = 1, 15 do
             if ui.graphDots[i] then
                 if i == closestIndex and not hf.isCandle then
@@ -459,7 +471,7 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
                 end
             end
         end
-        
+
         if ui.graphHighlightLine and hf.x then
             ui.graphHighlightLine:ClearAllPoints()
             ui.graphHighlightLine:SetPoint("TOPLEFT", ui.graphFrame, "TOPLEFT", hf.x, -8)
@@ -468,4 +480,3 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
         end
     end
 end
-

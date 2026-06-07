@@ -8,9 +8,13 @@
 | :---: | :---: |
 | ![HUD Display](Screenshots/HUD.png) | ![Options Window](Screenshots/Options.png) |
 
-| Graph Price Tooltip | Trend Sparkline History | HODL Breakdown |
-| :---: | :---: | :---: |
-| ![Graph Price Tooltip](Screenshots/Graph_Tooltip.png) | ![Trend Sparkline History](Screenshots/Trend_Tooltip.png) | ![HODL Breakdown](Screenshots/HODL_Tooltip.png) |
+| Area Graph Tooltip | Candle Graph Tooltip |
+| :---: | :---: |
+| ![Area Graph Tooltip](Screenshots/Graph_Tooltip.png) | ![Candle Graph Tooltip](Screenshots/Candle_Tooltip.png) |
+
+| Trend Sparkline History | HODL Breakdown |
+| :---: | :---: |
+| ![Trend Sparkline History](Screenshots/Trend_Tooltip.png) | ![HODL Breakdown](Screenshots/HODL_Tooltip.png) |
 
 ---
 
@@ -39,7 +43,7 @@
   - *Goblins of Gadgetzan Integration* (Price pumps)
   - *Mysterious Murloc Whales* (Price surges)
 - **Live Server Sync**: Automatically disables mock simulation and locks onto live server broadcast prices whenever chat patterns matching `SHELLCOINTICKER BUY/SELL PRICE` or `SHELLCOINTICKER PRICE HAS` gold/silver/copper formats are spotted in public or private channels.
-- **Silent Auto Price Sync**: Periodically runs the `.shellcoin` server command internally to fetch live prices (configurable to **Off**, **1M**, **10M**, or **1H**). Both the outgoing command and incoming server replies are silently filtered from the player's chat log.
+- **Silent Auto Price Sync**: Automatically updates prices in the background (**Off**, **10M**, **30M**, or **1H**) without showing commands in chat. It also syncs automatically on login or UI reload if the price is outdated.
 
 ### 5. Premium Two-Column Options UI
 - **Left Column**: General settings (Toggle HUD visibility, Toggle Minimap button, Graph style Area/Candle selector, HUD scale slider, and **Auto Sync** interval selection).

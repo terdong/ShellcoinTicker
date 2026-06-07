@@ -2,7 +2,7 @@
 ## Title: ShellcoinTicker
 ## Notes: Track your Shellcoin HODLings and the real-time simulated market price of SHELL!
 ## Author: Terdong
-## Version: 1.0.10
+## Version: 1.0.11
 ## SavedVariables: ShellcoinTickerDB
 
 Core.lua

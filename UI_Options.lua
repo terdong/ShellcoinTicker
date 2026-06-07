@@ -224,9 +224,9 @@ function ShellcoinTicker.UI:CreateOptionsFrame()
     end
     
     f.syncOffBtn = CreateSyncButton("Off", 0, syncLabel, "RIGHT", 8)
-    f.sync1mBtn = CreateSyncButton("1M", 60, f.syncOffBtn, "RIGHT", 5)
-    f.sync10mBtn = CreateSyncButton("10M", 600, f.sync1mBtn, "RIGHT", 5)
-    f.sync1hBtn = CreateSyncButton("1H", 3600, f.sync10mBtn, "RIGHT", 5)
+    f.sync10mBtn = CreateSyncButton("10M", 600, f.syncOffBtn, "RIGHT", 5)
+    f.sync30mBtn = CreateSyncButton("30M", 1800, f.sync10mBtn, "RIGHT", 5)
+    f.sync1hBtn = CreateSyncButton("1H", 3600, f.sync30mBtn, "RIGHT", 5)
     
     -- RIGHT COLUMN (HUD Component Visibility Settings)
     local hudVisibilityTitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -330,16 +330,16 @@ function ShellcoinTicker.UI:RefreshOptionsUI()
     -- Sync Interval Lock Highlight
     local interval = ShellcoinTickerDB.syncInterval or 600
     if f.syncOffBtn then f.syncOffBtn:UnlockHighlight() end
-    if f.sync1mBtn then f.sync1mBtn:UnlockHighlight() end
     if f.sync10mBtn then f.sync10mBtn:UnlockHighlight() end
+    if f.sync30mBtn then f.sync30mBtn:UnlockHighlight() end
     if f.sync1hBtn then f.sync1hBtn:UnlockHighlight() end
     
     if interval == 0 then
         if f.syncOffBtn then f.syncOffBtn:LockHighlight() end
-    elseif interval == 60 then
-        if f.sync1mBtn then f.sync1mBtn:LockHighlight() end
     elseif interval == 600 then
         if f.sync10mBtn then f.sync10mBtn:LockHighlight() end
+    elseif interval == 1800 then
+        if f.sync30mBtn then f.sync30mBtn:LockHighlight() end
     elseif interval == 3600 then
         if f.sync1hBtn then f.sync1hBtn:LockHighlight() end
     end

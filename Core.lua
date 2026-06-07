@@ -219,7 +219,7 @@ end
 function ShellcoinTicker:ScanBags()
     local charKey = UnitName("player")
     if not charKey or charKey == "" or charKey == "Unknown Creature" then return end
-    
+
     if not ShellcoinTickerDB.characters then
         ShellcoinTickerDB.characters = {}
     end
@@ -533,23 +533,27 @@ function ShellcoinTicker:ProcessChatMessage(msg)
     end
 end
 
--- Check and trigger initial price sync on login if difference exceeds syncInterval
+-- Check and trigger initial price sync on login/reload
 function ShellcoinTicker:CheckAndTriggerInitialSync()
-    if not ShellcoinTickerDB then return end
-    local syncInterval = ShellcoinTickerDB.syncInterval or 600
-    if syncInterval > 0 and not ShellcoinTickerDB.mockMode and not ShellcoinTicker.speedrunMode then
-        local history = ShellcoinTickerDB.history
-        local lastTime = 0
-        if history and table.getn(history) > 0 then
-            local lastEntry = history[table.getn(history)]
-            if lastEntry and type(lastEntry) == "table" and lastEntry.time then
-                lastTime = lastEntry.time
-            end
+    if not ShellcoinTickerDB or ShellcoinTickerDB.mockMode or ShellcoinTicker.speedrunMode then return end
+    
+    local interval = ShellcoinTickerDB.syncInterval or 600
+    if interval == 0 then
+        interval = 600 -- Default to 10 minutes if auto sync is off
+    end
+    
+    local history = ShellcoinTickerDB.history
+    local lastTime = 0
+    if history and table.getn(history) > 0 then
+        local lastEntry = history[table.getn(history)]
+        if lastEntry and type(lastEntry) == "table" and lastEntry.time then
+            lastTime = lastEntry.time
         end
-        if time() - lastTime > syncInterval then
-            ShellcoinTicker.isSilentSync = true
-            SendChatMessage(".shellcoin", "SAY")
-        end
+    end
+    
+    if time() - lastTime > interval then
+        ShellcoinTicker.isSilentSync = true
+        SendChatMessage(".shellcoin", "SAY")
     end
 end
 
@@ -573,7 +577,7 @@ local function OnEvent()
         ShellcoinTicker.scanPending = true
         if not ShellcoinTicker.initialSyncDone then
             ShellcoinTicker.initialSyncDone = true
-            
+
             -- Delayed check to ensure server chat connection is fully ready
             local loginTimer = 0
             this:SetScript("OnUpdate", function()
@@ -911,7 +915,8 @@ end
 
 -- Define Static Popup Dialog for Mock Mode Warning
 StaticPopupDialogs["SCT_MOCK_CONFIRM"] = {
-    text = "WARNING: Enabling Mock Mode or generating mock history may modify or lose your accumulated historical data. Do you want to proceed?",
+    text =
+    "WARNING: Enabling Mock Mode or generating mock history may modify or lose your accumulated historical data. Do you want to proceed?",
     button1 = "Yes",
     button2 = "No",
     OnAccept = function()
