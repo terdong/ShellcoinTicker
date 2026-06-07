@@ -235,9 +235,8 @@ function ShellcoinTicker.UI:UpdateGraph()
                 table.insert(tempPoints, { time = t, price = filtered[i].price })
             end
         end
-        if ShellcoinTickerDB.mockMode then
-            table.insert(tempPoints, { time = refTime, price = price })
-        end
+        -- Always insert the current price at the current time to extend the graph to the rightmost edge
+        table.insert(tempPoints, { time = refTime, price = price })
         
         -- Downsample tempPoints to at most 15 points (keeping boundary points intact)
         local points = {}
@@ -361,3 +360,112 @@ function ShellcoinTicker.UI:UpdateGraph()
         end
     end
 end
+
+function ShellcoinTicker.UI.Graph_OnUpdate()
+    local ui = ShellcoinTicker.UI
+    local scale = ui.graphFrame:GetEffectiveScale()
+    local left = ui.graphFrame:GetLeft()
+    if not left then return end
+    
+    local xpos, ypos = GetCursorPosition()
+    local mouseX = (xpos / scale) - left
+    
+    local numActive = 0
+    for i = 1, 15 do
+        if ui.graphHoverFrames[i] and ui.graphHoverFrames[i]:IsShown() then
+            numActive = i
+        else
+            break
+        end
+    end
+    
+    if numActive == 0 then return end
+    
+    local closestIndex = nil
+    local minDistance = 999999
+    
+    for i = 1, numActive do
+        local hf = ui.graphHoverFrames[i]
+        if hf and hf.x then
+            local dist = math.abs(hf.x - mouseX)
+            if dist < minDistance then
+                minDistance = dist
+                closestIndex = i
+            end
+        end
+    end
+    
+    if not closestIndex then return end
+    
+    if closestIndex ~= ui.activeGraphIndex then
+        ui.activeGraphIndex = closestIndex
+        
+        local hf = ui.graphHoverFrames[closestIndex]
+        
+        GameTooltip:SetOwner(ui.graphFrame, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        
+        if hf.isCandle then
+            GameTooltip:AddLine("Candle Details", 1, 0.82, 0)
+            GameTooltip:AddLine(" ")
+            local startTimeStr = date("%m/%d %H:%M", hf.startTime)
+            local endTimeStr = date("%m/%d %H:%M", hf.endTime)
+            GameTooltip:AddDoubleLine("Time Range:", startTimeStr .. " - " .. endTimeStr, 1, 1, 1, 1, 1, 1)
+            GameTooltip:AddDoubleLine("Open:", ShellcoinTicker:FormatMoney(hf.open), 1, 1, 1, 1, 1, 1)
+            GameTooltip:AddDoubleLine("Close:", ShellcoinTicker:FormatMoney(hf.close), 1, 1, 1, 1, 1, 1)
+            GameTooltip:AddDoubleLine("High:", ShellcoinTicker:FormatMoney(hf.high), 1, 1, 1, 1, 1, 1)
+            GameTooltip:AddDoubleLine("Low:", ShellcoinTicker:FormatMoney(hf.low), 1, 1, 1, 1, 1, 1)
+            
+            local diff = hf.close - hf.open
+            local percent = (hf.open > 0) and ((diff / hf.open) * 100) or 0
+            local changeText
+            if diff > 0 then
+                changeText = "|cff00ff00+" .. ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
+            elseif diff < 0 then
+                changeText = "|cffff0000-" .. ShellcoinTicker:FormatMoney(math.abs(diff)) .. " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
+            else
+                changeText = "|cff8888880.0%|r"
+            end
+            GameTooltip:AddDoubleLine("Change:", changeText, 1, 1, 1, 1, 1, 1)
+        else
+            GameTooltip:AddLine("Price Details", 1, 0.82, 0)
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddDoubleLine("Time:", date("%Y/%m/%d %H:%M", hf.time), 1, 1, 1, 1, 1, 1)
+            GameTooltip:AddDoubleLine("Price:", ShellcoinTicker:FormatMoney(hf.price), 1, 1, 1, 1, 1, 1)
+            
+            if hf.prevPrice and hf.prevPrice > 0 then
+                local diff = hf.price - hf.prevPrice
+                local percent = (diff / hf.prevPrice) * 100
+                local changeText
+                if diff > 0 then
+                    changeText = "|cff00ff00+" .. ShellcoinTicker:FormatMoney(diff) .. " (+" .. string.format("%.1f%%", percent) .. ")|r"
+                elseif diff < 0 then
+                    changeText = "|cffff0000-" .. ShellcoinTicker:FormatMoney(math.abs(diff)) .. " (-" .. string.format("%.1f%%", math.abs(percent)) .. ")|r"
+                else
+                    changeText = "|cff8888880.0%|r"
+                end
+                GameTooltip:AddDoubleLine("Change:", changeText, 1, 1, 1, 1, 1, 1)
+            end
+        end
+        
+        GameTooltip:Show()
+        
+        for i = 1, 15 do
+            if ui.graphDots[i] then
+                if i == closestIndex and not hf.isCandle then
+                    ui.graphDots[i]:Show()
+                else
+                    ui.graphDots[i]:Hide()
+                end
+            end
+        end
+        
+        if ui.graphHighlightLine and hf.x then
+            ui.graphHighlightLine:ClearAllPoints()
+            ui.graphHighlightLine:SetPoint("TOPLEFT", ui.graphFrame, "TOPLEFT", hf.x, -8)
+            ui.graphHighlightLine:SetPoint("BOTTOMLEFT", ui.graphFrame, "BOTTOMLEFT", hf.x, 8)
+            ui.graphHighlightLine:Show()
+        end
+    end
+end
+
