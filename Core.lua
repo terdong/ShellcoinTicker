@@ -175,8 +175,10 @@ function ShellcoinTicker:InitializeDB()
     if not ShellcoinTickerDB.characters then
         ShellcoinTickerDB.characters = {}
     end
-    if not ShellcoinTickerDB.characters[charKey] then
-        ShellcoinTickerDB.characters[charKey] = { bags = 0, bank = 0 }
+    if charKey and charKey ~= "" and charKey ~= "Unknown Creature" then
+        if not ShellcoinTickerDB.characters[charKey] then
+            ShellcoinTickerDB.characters[charKey] = { bags = 0, bank = 0 }
+        end
     end
     if not ShellcoinTickerDB.graphMode then
         ShellcoinTickerDB.graphMode = "area"
@@ -216,6 +218,8 @@ end
 -- Scan player bags and bank for Shellcoin
 function ShellcoinTicker:ScanBags()
     local charKey = UnitName("player")
+    if not charKey or charKey == "" or charKey == "Unknown Creature" then return end
+    
     if not ShellcoinTickerDB.characters then
         ShellcoinTickerDB.characters = {}
     end
@@ -562,6 +566,10 @@ local function OnEvent()
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cff00ff00ShellcoinTicker loaded! Type /sct or /shellcointicker to toggle the HUD.|r")
     elseif event == "PLAYER_ENTERING_WORLD" then
+        ShellcoinTicker:InitializeDB()
+        if ShellcoinTicker.UI and ShellcoinTicker.UI.CreateMainFrame then
+            ShellcoinTicker.UI:CreateMainFrame()
+        end
         ShellcoinTicker.scanPending = true
         if not ShellcoinTicker.initialSyncDone then
             ShellcoinTicker.initialSyncDone = true
