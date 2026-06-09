@@ -305,7 +305,16 @@ function ShellcoinTicker:ScanBags()
     -- Track transactions automatically on changes after the first scan
     if not firstScan and newAuth ~= oldAuth then
         local diff = newAuth - oldAuth
-        self:AddTransaction(diff, ShellcoinTickerDB.price)
+        if self.pendingGossipTx and (time() - self.pendingGossipTx.time < 5) then
+            local txType = self.pendingGossipTx.type
+            if (diff > 0 and txType == "buy") or (diff < 0 and txType == "sell") then
+                self:AddTransaction(diff, self.pendingGossipTx.price)
+            end
+            self.pendingGossipTx = nil
+        elseif self.pendingDelete and diff < 0 then
+            self:AddTransaction(diff, 0) -- record as sold/destroyed for 0 copper
+            self.pendingDelete = nil
+        end
     end
 end
 
@@ -936,4 +945,60 @@ StaticPopupDialogs["SCT_MOCK_CONFIRM"] = {
 function ShellcoinTicker:ConfirmMockAction(actionFunc)
     self.pendingMockAction = actionFunc
     StaticPopup_Show("SCT_MOCK_CONFIRM")
+end
+
+-- Hook Gossip option selection to capture NPC transaction price and intent
+local original_SelectGossipOption = SelectGossipOption
+SelectGossipOption = function(index)
+    if GetGossipOptions then
+        local opts = { GetGossipOptions() }
+        local numOpts = table.getn(opts) / 2
+        if index >= 1 and index <= numOpts then
+            local text = opts[(index - 1) * 2 + 1]
+            if text then
+                local textLower = string.lower(text)
+                local isBuy = string.find(textLower, "buy for", 1, true)
+                local isSell = string.find(textLower, "sell for", 1, true)
+                if isBuy or isSell then
+                    local price = ShellcoinTicker:ParseMoneyString(text)
+                    if price and price > 0 then
+                        ShellcoinTicker.pendingGossipTx = {
+                            type = isBuy and "buy" or "sell",
+                            price = price,
+                            time = time()
+                        }
+                    end
+                end
+            end
+        end
+    end
+    if original_SelectGossipOption then
+        original_SelectGossipOption(index)
+    end
+end
+
+-- Hook DeleteCursorItem to detect when the player destroys Shellcoin
+local original_DeleteCursorItem = DeleteCursorItem
+DeleteCursorItem = function()
+    local isShellcoinDelete = false
+    local numDialogs = STATICPOPUP_NUMDIALOGS or 4
+    for i = 1, numDialogs do
+        local frameName = "StaticPopup" .. i
+        local frame = getglobal(frameName)
+        if frame and frame:IsShown() and (frame.which == "DELETE_ITEM" or frame.which == "DELETE_GOOD_ITEM") then
+            local textFrame = getglobal(frameName .. "Text")
+            local text = textFrame and textFrame:GetText() or ""
+            if string.find(text, "Shellcoin", 1, true) and not string.find(text, "Counterfeit Shellcoin", 1, true) then
+                isShellcoinDelete = true
+            end
+        end
+    end
+
+    if isShellcoinDelete then
+        ShellcoinTicker.pendingDelete = true
+    end
+
+    if original_DeleteCursorItem then
+        original_DeleteCursorItem()
+    end
 end

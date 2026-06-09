@@ -528,7 +528,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
                 end
             end
 
-            if ShellcoinTicker.scanPending then
+            if ShellcoinTicker.scanPending and not CursorHasItem() then
                 ShellcoinTicker:ScanBags()
                 ShellcoinTicker.scanPending = false
                 ShellcoinTicker.UI:UpdateDisplay()
