@@ -2,6 +2,7 @@
 -- HUD Layout, Frame Creation, and Updates for ShellcoinTicker (Vanilla WoW 1.12)
 
 ShellcoinTicker.UI = {
+    MAX_POINTS = 100,
     frame = nil,
     priceText = nil,
     trendText = nil,
@@ -45,7 +46,8 @@ function ShellcoinTicker.UI:UpdateTimeframeButtonHighlights()
         ["1d"] = self.btn1d,
         ["1w"] = self.btn1w,
         ["1mo"] = self.btn1mo,
-        ["1y"] = self.btn1y
+        ["1y"] = self.btn1y,
+        ["10y"] = self.btn10y
     }
     for key, btn in pairs(buttons) do
         if btn then
@@ -196,7 +198,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
                 local prev = prevEntry.price or 0
                 local curr = currEntry.price or 0
                 local t = currEntry.time or 0
-                
+
                 local diff = curr - prev
                 local percent = (prev > 0) and ((diff / prev) * 100) or 0
                 local changeText
@@ -207,7 +209,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
                 else
                     changeText = "|cff8888880.00%|r"
                 end
-                
+
                 local timeStr = date("%m/%d %H:%M", t)
                 GameTooltip:AddDoubleLine(
                     "|cffffffff" .. timeStr .. "|r   " .. ShellcoinTicker:FormatMoney(curr),
@@ -254,6 +256,8 @@ function ShellcoinTicker.UI:CreateMainFrame()
     self.btn1w = CreateTFButton("1W", "1w", tfFrame, 88)
     self.btn1mo = CreateTFButton("1Mo", "1mo", tfFrame, 132)
     self.btn1y = CreateTFButton("1Y", "1y", tfFrame, 176)
+    self.btn10y = CreateTFButton("10Y", "10y", tfFrame, 220)
+    self.btn10y:Hide()
 
     -- Inner Graph Frame (Width 256, Height 60, aligned below tfFrame)
     local graphFrame = CreateFrame("Frame", "ShellcoinTickerGraph", frame)
@@ -295,10 +299,9 @@ function ShellcoinTicker.UI:CreateMainFrame()
         if ui.graphHighlightLine then
             ui.graphHighlightLine:Hide()
         end
-        if ui.graphDots then
-            for i = 1, 15 do
-                ui.graphDots[i]:Hide()
-            end
+        -- Hide only the active dot instead of iterating all MAX_POINTS
+        if ui.activeGraphIndex and ui.graphDots[ui.activeGraphIndex] then
+            ui.graphDots[ui.activeGraphIndex]:Hide()
         end
         ui.activeGraphIndex = nil
     end)
@@ -321,7 +324,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
     self.graphVLines = {}
     self.graphBars = {}
 
-    for i = 1, 15 do
+    for i = 1, self.MAX_POINTS do
         local dot = graphFrame:CreateTexture(nil, "OVERLAY")
         dot:SetWidth(4)
         dot:SetHeight(4)
@@ -330,7 +333,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
         table.insert(self.graphDots, dot)
     end
 
-    for i = 1, 14 do
+    for i = 1, self.MAX_POINTS - 1 do
         local hline = graphFrame:CreateTexture(nil, "ARTWORK")
         hline:SetHeight(1.5)
         hline:SetTexture(0, 0.65, 1, 0.8)
@@ -359,7 +362,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
 
     -- Hover frames for tooltip interactivity (data structures only)
     self.graphHoverFrames = {}
-    for i = 1, 15 do
+    for i = 1, self.MAX_POINTS do
         local hf = CreateFrame("Frame", nil, graphFrame)
         hf:EnableMouse(false)
         hf:SetFrameLevel(graphFrame:GetFrameLevel() + 5)
@@ -505,7 +508,7 @@ function ShellcoinTicker.UI:CreateMainFrame()
                     table.insert(ShellcoinTickerDB.history, { time = ShellcoinTicker.virtualTime, price = newPrice })
 
                     -- Prune
-                    local cutoff = ShellcoinTicker.virtualTime - 31536000
+                    local cutoff = ShellcoinTicker.virtualTime - 315360000
                     local pruned = {}
                     for i = 1, table.getn(ShellcoinTickerDB.history) do
                         local entry = ShellcoinTickerDB.history[i]
@@ -779,8 +782,33 @@ end
 function ShellcoinTicker.UI:UpdateDisplay()
     if not self.frame or not ShellcoinTickerDB then return end
 
-    -- Update layout to match current settings
-    self:LayoutHUD()
+    -- Determine dynamically if we should show the "10Y" button (> 1 year of data)
+    local show10Y = false
+    local history = ShellcoinTickerDB.history
+    if history and table.getn(history) > 0 then
+        local oldest = history[1]
+        if oldest and type(oldest) == "table" and oldest.time then
+            local now = time()
+            if ShellcoinTicker.speedrunMode then
+                now = ShellcoinTicker.virtualTime
+            end
+            if now - oldest.time > 31536000 then -- 1 year in seconds
+                show10Y = true
+            end
+        end
+    end
+
+    if self.btn10y then
+        if show10Y then
+            self.btn10y:Show()
+        else
+            self.btn10y:Hide()
+            if ShellcoinTickerDB.selectedTimeframe == "10y" then
+                ShellcoinTickerDB.selectedTimeframe = "1y"
+                self:UpdateTimeframeButtonHighlights()
+            end
+        end
+    end
 
     -- Update minimap button icon dynamically once cached
     self:UpdateMinimapIcon()
@@ -837,12 +865,9 @@ function ShellcoinTicker.UI:UpdateDisplay()
     local changeStr = changeColor .. changeSign .. string.format("%.1f%%", change * 100) .. "|r"
     self.priceText:SetText(priceStr .. " (" .. changeStr .. ")")
 
-    -- Build trend sparkline using safe characters
-    local trendStr = "Trend: "
+    -- Build activeHistory once and cache for reuse by sparkline and graph
     local history = ShellcoinTickerDB.history
     local numPoints = history and table.getn(history) or 0
-
-    -- Filter out 0-price placeholders for sparkline and graph to avoid skewed scaling
     local activeHistory = {}
     if history then
         for i = 1, numPoints do
@@ -852,8 +877,11 @@ function ShellcoinTicker.UI:UpdateDisplay()
             end
         end
     end
+    self.cachedActiveHistory = activeHistory
     local numActivePoints = table.getn(activeHistory)
 
+    -- Build trend sparkline using safe characters
+    local trendStr = "Trend: "
     if numActivePoints > 1 then
         local startIdx = math.max(2, numActivePoints - 19)
         for i = startIdx, numActivePoints do

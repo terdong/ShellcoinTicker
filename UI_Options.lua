@@ -236,31 +236,37 @@ function ShellcoinTicker.UI:CreateOptionsFrame()
     
     CreateCheckButton("ShellcoinTickerOptionsFrameShowFinancials", "Financials (Invested & P/L)", 280, -60, function()
         ShellcoinTickerDB.showFinancials = this:GetChecked() and true or false
+        ShellcoinTicker.UI:LayoutHUD()
         ShellcoinTicker.UI:UpdateDisplay()
     end)
     
     CreateCheckButton("ShellcoinTickerOptionsFrameShowPriceTrend", "Price & Trend Sparkline", 280, -84, function()
         ShellcoinTickerDB.showPriceTrend = this:GetChecked() and true or false
+        ShellcoinTicker.UI:LayoutHUD()
         ShellcoinTicker.UI:UpdateDisplay()
     end)
     
     CreateCheckButton("ShellcoinTickerOptionsFrameShowTimeframe", "Timeframe Buttons", 280, -108, function()
         ShellcoinTickerDB.showTimeframe = this:GetChecked() and true or false
+        ShellcoinTicker.UI:LayoutHUD()
         ShellcoinTicker.UI:UpdateDisplay()
     end)
     
     CreateCheckButton("ShellcoinTickerOptionsFrameShowChart", "Graph Chart", 280, -132, function()
         ShellcoinTickerDB.showChart = this:GetChecked() and true or false
+        ShellcoinTicker.UI:LayoutHUD()
         ShellcoinTicker.UI:UpdateDisplay()
     end)
     
     CreateCheckButton("ShellcoinTickerOptionsFrameShowHoldings", "Holdings & Net Worth", 280, -156, function()
         ShellcoinTickerDB.showHoldings = this:GetChecked() and true or false
+        ShellcoinTicker.UI:LayoutHUD()
         ShellcoinTicker.UI:UpdateDisplay()
     end)
     
     CreateCheckButton("ShellcoinTickerOptionsFrameShowFeed", "News Feed", 280, -180, function()
         ShellcoinTickerDB.showFeed = this:GetChecked() and true or false
+        ShellcoinTicker.UI:LayoutHUD()
         ShellcoinTicker.UI:UpdateDisplay()
     end)
     

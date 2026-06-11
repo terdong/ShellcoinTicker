@@ -1,18 +1,131 @@
 -- UI_Graph.lua
 -- Graph Drawing Engine for ShellcoinTicker (Vanilla WoW 1.12)
 
+-- LTTB (Largest Triangle Three Buckets) Downsampling helper
+-- Reduces tempPoints to at most maxPoints while preserving visual fidelity.
+-- preserveStart: number of leading points to keep intact (1 or 2)
+-- Returns the downsampled points array.
+local function LTTBDownsample(tempPoints, maxPoints, cutoff, priceAtCutoff)
+    local N = table.getn(tempPoints)
+    if N <= maxPoints then return tempPoints end
+
+    local points = {}
+    -- Determine how many leading points to preserve
+    local preserveStart = 1
+    if tempPoints[1].isVirtual then
+        preserveStart = 2
+        table.insert(points, tempPoints[1])
+        table.insert(points, tempPoints[2])
+    else
+        table.insert(points, tempPoints[1])
+    end
+
+    local activeStartPt = points[table.getn(points)]
+    local activeStart = activeStartPt.time
+    local activeEnd = tempPoints[N].time
+    local activeDuration = activeEnd - activeStart
+
+    local numBuckets = maxPoints - preserveStart - 1
+    if numBuckets < 1 then numBuckets = 1 end
+    local w = activeDuration / numBuckets
+
+    local buckets = {}
+    local bucketAverages = {}
+    for b = 1, numBuckets do
+        buckets[b] = {}
+    end
+
+    -- Group interior points into buckets
+    local interiorStart = preserveStart + 1
+    for j = interiorStart, N - 1 do
+        local entry = tempPoints[j]
+        if entry.time then
+            local b = math.floor((entry.time - activeStart) / w) + 1
+            if b >= 1 and b <= numBuckets then
+                table.insert(buckets[b], entry)
+            elseif b > numBuckets then
+                table.insert(buckets[numBuckets], entry)
+            end
+        end
+    end
+
+    -- Calculate averages for each bucket
+    local lastKnownPrice = activeStartPt.price
+    for b = 1, numBuckets do
+        local pts = buckets[b]
+        local count = table.getn(pts)
+        if count > 0 then
+            local sumTime = 0
+            local sumPrice = 0
+            for k = 1, count do
+                sumTime = sumTime + pts[k].time
+                sumPrice = sumPrice + pts[k].price
+            end
+            bucketAverages[b] = { time = sumTime / count, price = sumPrice / count }
+            lastKnownPrice = pts[count].price
+        else
+            local bStart = activeStart + (b - 1) * w
+            local bEnd = activeStart + b * w
+            bucketAverages[b] = { time = (bStart + bEnd) / 2, price = lastKnownPrice }
+        end
+    end
+
+    -- Select 1 point per bucket maximizing triangle area
+    for b = 1, numBuckets do
+        local p1 = points[table.getn(points)]
+        local p3_x, p3_y = tempPoints[N].time, tempPoints[N].price
+        for next_b = b + 1, numBuckets do
+            local next_pts = buckets[next_b]
+            if table.getn(next_pts) > 0 then
+                p3_x, p3_y = bucketAverages[next_b].time, bucketAverages[next_b].price
+                break
+            end
+        end
+
+        local pts = buckets[b]
+        local count = table.getn(pts)
+        if count > 0 then
+            local bestPoint = pts[1]
+            local maxArea = -1
+            local dx1 = p1.time - cutoff
+            local dy1 = p1.price - priceAtCutoff
+            local dx3 = p3_x - cutoff
+            local dy3 = p3_y - priceAtCutoff
+
+            for k = 1, count do
+                local p2 = pts[k]
+                local dx2 = p2.time - cutoff
+                local dy2 = p2.price - priceAtCutoff
+                local area = math.abs(
+                    dx1 * (dy2 - dy3) +
+                    dx2 * (dy3 - dy1) +
+                    dx3 * (dy1 - dy2)
+                )
+                if area > maxArea then
+                    maxArea = area
+                    bestPoint = p2
+                end
+            end
+            table.insert(points, bestPoint)
+        end
+    end
+
+    table.insert(points, tempPoints[N])
+    return points
+end
+
 function ShellcoinTicker.UI:UpdateGraph()
     if not self.frame or not ShellcoinTickerDB then return end
 
     -- Redraw Line Graph
     -- Hide all graph elements first
-    for i = 1, 15 do
+    for i = 1, self.MAX_POINTS do
         self.graphDots[i]:Hide()
         if self.graphHoverFrames and self.graphHoverFrames[i] then
             self.graphHoverFrames[i]:Hide()
         end
     end
-    for i = 1, 14 do
+    for i = 1, self.MAX_POINTS - 1 do
         self.graphHLines[i]:Hide()
         self.graphVLines[i]:Hide()
         self.graphBars[i]:Hide()
@@ -22,20 +135,33 @@ function ShellcoinTicker.UI:UpdateGraph()
     end
 
     local price = ShellcoinTickerDB.price or 0
-    local history = ShellcoinTickerDB.history
-    local numPoints = history and table.getn(history) or 0
 
-    -- Filter out 0-price placeholders for sparkline and graph to avoid skewed scaling
-    local activeHistory = {}
-    if history then
-        for i = 1, numPoints do
-            local entry = history[i]
-            if entry and type(entry) == "table" and entry.price and entry.price > 0 then
-                table.insert(activeHistory, entry)
+    -- Reuse cached activeHistory from UpdateDisplay() to avoid redundant filtering
+    local activeHistory = self.cachedActiveHistory
+    if not activeHistory then
+        -- Fallback: build it if called standalone (safety net)
+        activeHistory = {}
+        local history = ShellcoinTickerDB.history
+        local numPoints = history and table.getn(history) or 0
+        if history then
+            for i = 1, numPoints do
+                local entry = history[i]
+                if entry and type(entry) == "table" and entry.price and entry.price > 0 then
+                    table.insert(activeHistory, entry)
+                end
             end
         end
     end
     local numActivePoints = table.getn(activeHistory)
+
+    local refTime = time()
+    if ShellcoinTicker.speedrunMode then
+        refTime = ShellcoinTicker.virtualTime
+    elseif not ShellcoinTickerDB.mockMode then
+        if numActivePoints > 0 then
+            refTime = activeHistory[numActivePoints].time or time()
+        end
+    end
 
     -- Filter history based on selected timeframe
     local tf = ShellcoinTickerDB.selectedTimeframe
@@ -52,19 +178,13 @@ function ShellcoinTicker.UI:UpdateGraph()
         duration = 2592000
     elseif tf == "1y" then
         duration = 31536000
+    elseif tf == "10y" then
+        duration = 315360000
     end
 
-    local refTime = time()
-    if ShellcoinTicker.speedrunMode then
-        refTime = ShellcoinTicker.virtualTime
-    elseif not ShellcoinTickerDB.mockMode then
-        if numActivePoints > 0 then
-            refTime = activeHistory[numActivePoints].time or time()
-        end
-    end
     local cutoff = refTime - duration
-    local filtered = {}
 
+    local filtered = {}
     for i = 1, numActivePoints do
         local entry = activeHistory[i]
         if entry.time and entry.time >= cutoff and entry.time <= refTime then
@@ -100,13 +220,14 @@ function ShellcoinTicker.UI:UpdateGraph()
             end
         end
 
+        local numFiltered = table.getn(filtered)
         for i = 1, 14 do
             local iStart = startTime + (i - 1) * intervalWidth
             local iEnd = startTime + i * intervalWidth
 
             -- Find points in this interval
             local intervalPoints = {}
-            for j = 1, table.getn(filtered) do
+            for j = 1, numFiltered do
                 local t = filtered[j].time
                 if t >= iStart and t < iEnd then
                     table.insert(intervalPoints, filtered[j].price)
@@ -114,12 +235,13 @@ function ShellcoinTicker.UI:UpdateGraph()
             end
 
             local c = {}
-            if table.getn(intervalPoints) > 0 then
+            local numInterval = table.getn(intervalPoints)
+            if numInterval > 0 then
                 c.open = intervalPoints[1]
-                c.close = intervalPoints[table.getn(intervalPoints)]
+                c.close = intervalPoints[numInterval]
                 c.high = intervalPoints[1]
                 c.low = intervalPoints[1]
-                for j = 1, table.getn(intervalPoints) do
+                for j = 1, numInterval do
                     local p = intervalPoints[j]
                     if p > c.high then c.high = p end
                     if p < c.low then c.low = p end
@@ -154,19 +276,15 @@ function ShellcoinTicker.UI:UpdateGraph()
         self.graphMaxText:Show()
         self.graphMinText:Show()
 
-        local function GetY(p)
-            return paddingY + ((p - minPrice) / (maxPrice - minPrice)) * drawHeight
-        end
-
         local candleWidth = drawWidth / 14
         for i = 1, 14 do
             local c = candles[i]
             local x = paddingX + (i - 1) * candleWidth + (candleWidth / 2)
 
-            local yOpen = GetY(c.open)
-            local yClose = GetY(c.close)
-            local yHigh = GetY(c.high)
-            local yLow = GetY(c.low)
+            local yOpen = paddingY + ((c.open - minPrice) / (maxPrice - minPrice)) * drawHeight
+            local yClose = paddingY + ((c.close - minPrice) / (maxPrice - minPrice)) * drawHeight
+            local yHigh = paddingY + ((c.high - minPrice) / (maxPrice - minPrice)) * drawHeight
+            local yLow = paddingY + ((c.low - minPrice) / (maxPrice - minPrice)) * drawHeight
 
             -- Color code: Green (rise), Red (fall), Gray (flat)
             local r, g, b = 0.6, 0.6, 0.6
@@ -217,6 +335,9 @@ function ShellcoinTicker.UI:UpdateGraph()
                 hf:Show()
             end
         end
+
+        -- Cache active hover frame count for OnUpdate optimization
+        self.graphActiveCount = 14
     else
         -- 2. AREA GRAPH MODE (WITH RISE/FALL COLOR CODING)
         -- Determine boundary price at the cutoff time
@@ -235,29 +356,23 @@ function ShellcoinTicker.UI:UpdateGraph()
         -- Build raw points covering full boundary from cutoff to refTime without duplicates
         local tempPoints = {}
         table.insert(tempPoints, { time = cutoff, price = priceAtCutoff })
-        for i = 1, table.getn(filtered) do
+        local numFiltered = table.getn(filtered)
+        for i = 1, numFiltered do
             local t = filtered[i].time
-            if t > cutoff and t <= refTime then
+            if t > cutoff and t < refTime then
                 table.insert(tempPoints, { time = t, price = filtered[i].price })
             end
         end
         -- Always insert the current price at the current time to extend the graph to the rightmost edge
         table.insert(tempPoints, { time = refTime, price = price })
 
-        -- Downsample tempPoints to at most 15 points (keeping boundary points intact)
-        local points = {}
-        local N = table.getn(tempPoints)
-        if N <= 15 then
-            for i = 1, N do
-                table.insert(points, tempPoints[i])
-            end
-        else
-            local step = (N - 1) / 14
-            for i = 1, 15 do
-                local index = math.floor(1 + (i - 1) * step + 0.5)
-                table.insert(points, tempPoints[index])
-            end
+        -- Mark virtual left boundary if history starts after cutoff
+        if numActivePoints > 0 and activeHistory[1].time and activeHistory[1].time > cutoff then
+            tempPoints[1].isVirtual = true
         end
+
+        -- Downsample using LTTB helper
+        local points = LTTBDownsample(tempPoints, self.MAX_POINTS, cutoff, priceAtCutoff)
 
         local graphPointsCount = table.getn(points)
 
@@ -280,17 +395,14 @@ function ShellcoinTicker.UI:UpdateGraph()
             self.graphMaxText:Show()
             self.graphMinText:Show()
 
-            local function GetY(p)
-                return paddingY + ((p - minPrice) / (maxPrice - minPrice)) * drawHeight
-            end
-
+            local priceRange = maxPrice - minPrice
             local lastX, lastY
             local sliceWidth = drawWidth / math.max(1, graphPointsCount - 1)
             for i = 1, graphPointsCount do
                 local p = points[i].price
                 local t = points[i].time
                 local x = paddingX + ((t - cutoff) / duration) * drawWidth
-                local y = GetY(p)
+                local y = paddingY + ((p - minPrice) / priceRange) * drawHeight
 
                 -- Keep dots hidden, but position them so they can be shown on hover
                 local dot = self.graphDots[i]
@@ -302,10 +414,12 @@ function ShellcoinTicker.UI:UpdateGraph()
                 if i > 1 then
                     local prevP = points[i - 1].price
                     local rL, gL, bL = 0.6, 0.6, 0.6 -- Gray default
-                    if p > prevP then
-                        rL, gL, bL = 0.0, 1.0, 0.2   -- Green rise
-                    elseif p < prevP then
-                        rL, gL, bL = 1.0, 0.2, 0.2   -- Red fall
+                    if not points[i - 1].isVirtual then
+                        if p > prevP then
+                            rL, gL, bL = 0.0, 1.0, 0.2   -- Green rise
+                        elseif p < prevP then
+                            rL, gL, bL = 1.0, 0.2, 0.2   -- Red fall
+                        end
                     end
 
                     -- Horizontal segment (+1 to width to eliminate corner gaps)
@@ -353,6 +467,7 @@ function ShellcoinTicker.UI:UpdateGraph()
                     hf.time = t
                     hf.price = p
                     hf.prevPrice = (i > 1) and points[i - 1].price or nil
+                    hf.isPrevVirtual = (i > 1) and points[i - 1].isVirtual or nil
                     hf.x = x
                     hf.dot = dot
                     hf:Show()
@@ -360,9 +475,13 @@ function ShellcoinTicker.UI:UpdateGraph()
 
                 lastX, lastY = x, y
             end
+
+            -- Cache active hover frame count for OnUpdate optimization
+            self.graphActiveCount = graphPointsCount
         else
             self.graphMaxText:Hide()
             self.graphMinText:Hide()
+            self.graphActiveCount = 0
         end
     end
 end
@@ -376,15 +495,8 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
     local xpos, ypos = GetCursorPosition()
     local mouseX = (xpos / scale) - left
 
-    local numActive = 0
-    for i = 1, 15 do
-        if ui.graphHoverFrames[i] and ui.graphHoverFrames[i]:IsShown() then
-            numActive = i
-        else
-            break
-        end
-    end
-
+    -- Use cached active count instead of iterating all MAX_POINTS
+    local numActive = ui.graphActiveCount or 0
     if numActive == 0 then return end
 
     local closestIndex = nil
@@ -404,6 +516,12 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
     if not closestIndex then return end
 
     if closestIndex ~= ui.activeGraphIndex then
+        -- Hide only the previously active dot instead of iterating all MAX_POINTS
+        local prevIndex = ui.activeGraphIndex
+        if prevIndex and ui.graphDots[prevIndex] then
+            ui.graphDots[prevIndex]:Hide()
+        end
+
         ui.activeGraphIndex = closestIndex
 
         local hf = ui.graphHoverFrames[closestIndex]
@@ -442,7 +560,7 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
             GameTooltip:AddDoubleLine("Time:", date("%Y/%m/%d %H:%M", hf.time), 1, 1, 1, 1, 1, 1)
             GameTooltip:AddDoubleLine("Price:", ShellcoinTicker:FormatMoney(hf.price), 1, 1, 1, 1, 1, 1)
 
-            if hf.prevPrice and hf.prevPrice > 0 then
+            if hf.prevPrice and hf.prevPrice > 0 and not hf.isPrevVirtual then
                 local diff = hf.price - hf.prevPrice
                 local percent = (diff / hf.prevPrice) * 100
                 local changeText
@@ -462,14 +580,9 @@ function ShellcoinTicker.UI.Graph_OnUpdate()
 
         GameTooltip:Show()
 
-        for i = 1, 15 do
-            if ui.graphDots[i] then
-                if i == closestIndex and not hf.isCandle then
-                    ui.graphDots[i]:Show()
-                else
-                    ui.graphDots[i]:Hide()
-                end
-            end
+        -- Show dot only for area mode
+        if not hf.isCandle and ui.graphDots[closestIndex] then
+            ui.graphDots[closestIndex]:Show()
         end
 
         if ui.graphHighlightLine and hf.x then

@@ -36,15 +36,7 @@ function ShellcoinTicker.UI:CreateMinimapButton()
         this.isDragging = true
         this.dragged = true
         this:LockHighlight()
-    end)
-    
-    minimapBtn:SetScript("OnDragStop", function()
-        this.isDragging = false
-        this:UnlockHighlight()
-    end)
-    
-    minimapBtn:SetScript("OnUpdate", function()
-        if this.isDragging then
+        this:SetScript("OnUpdate", function()
             local cx, cy = Minimap:GetCenter()
             local xpos, ypos = GetCursorPosition()
             local scale = Minimap:GetEffectiveScale()
@@ -54,7 +46,13 @@ function ShellcoinTicker.UI:CreateMinimapButton()
             if angle < 0 then angle = angle + 360 end
             ShellcoinTickerDB.minimapAngle = angle
             ShellcoinTicker.UI:UpdateMinimapButton()
-        end
+        end)
+    end)
+    
+    minimapBtn:SetScript("OnDragStop", function()
+        this.isDragging = false
+        this:SetScript("OnUpdate", nil)
+        this:UnlockHighlight()
     end)
     
     minimapBtn:SetScript("OnMouseDown", function()
